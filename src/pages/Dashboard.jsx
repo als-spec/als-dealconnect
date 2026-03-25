@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { BarChart3, Users, ClipboardList, TrendingUp, ArrowUpRight, DollarSign, Briefcase } from "lucide-react";
+import { BarChart3, Users, ClipboardList, TrendingUp, ArrowUpRight, DollarSign, Briefcase, MessageSquare } from "lucide-react";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 function StatCard({ icon: Icon, label, value, trend, trendUp }) {
@@ -30,11 +31,17 @@ function StatCard({ icon: Icon, label, value, trend, trendUp }) {
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const loadUser = async () => {
       const u = await base44.auth.me();
       setUser(u);
+      if (u?.id) {
+        const threads = await base44.entities.MessageThread.list('-last_message_at', 200);
+        const unread = threads.filter(t => t.participants?.includes(u.id) && t.unread_by?.includes(u.id));
+        setUnreadCount(unread.length);
+      }
     };
     loadUser();
   }, []);
@@ -85,6 +92,19 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {unreadCount > 0 && (
+        <Link to="/messages" className="flex items-center gap-4 p-4 rounded-2xl border border-teal/40 bg-teal/5 hover:bg-teal/10 transition-colors">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+            <MessageSquare className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-navy">You have {unreadCount} unread message{unreadCount > 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">Click to view your inbox</p>
+          </div>
+          <ArrowUpRight className="w-4 h-4 text-teal" />
+        </Link>
+      )}
+
       {/* Quick actions */}
       <div className="bg-card rounded-2xl border border-border p-6">
         <h2 className="text-lg font-bold text-navy mb-4">Quick Actions</h2>
@@ -99,7 +119,7 @@ export default function Dashboard() {
           {role === "tc" && (
             <>
               <QuickAction label="View Deal Board" description="Browse new deal requests" href="/deal-board" />
-              <QuickAction label="Messages" description="Check your inbox" href="/messages" />
+              <QuickAction label="Service Requests" description="Manage your active deals" href="/service-requests" />
               <QuickAction label="Edit Profile" description="Update your TC profile" href="/profile" />
             </>
           )}

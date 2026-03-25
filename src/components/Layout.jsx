@@ -12,6 +12,7 @@ export default function Layout({ user }) {
     <div className="min-h-screen bg-background">
       <Sidebar
         userRole={userRole}
+        userId={user?.id}
         collapsed={collapsed}
         onToggle={() => setCollapsed(!collapsed)}
       />

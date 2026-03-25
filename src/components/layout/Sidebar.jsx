@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import Logo from "../Logo";
+import UnreadBadge from "./UnreadBadge";
 import {
   LayoutDashboard,
   Users,
@@ -8,13 +9,13 @@ import {
   MessageSquare,
   BarChart3,
   Settings,
-  Shield,
   Building2,
   DollarSign,
   Briefcase,
   LogOut,
   ChevronLeft,
   Menu,
+  FileText,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
@@ -28,6 +29,7 @@ const NAV_ITEMS = {
   tc: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
+    { label: "Service Requests", icon: FileText, path: "/service-requests" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "Analytics", icon: BarChart3, path: "/analytics" },
     { label: "My Profile", icon: Briefcase, path: "/profile" },
@@ -35,6 +37,7 @@ const NAV_ITEMS = {
   investor: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
+    { label: "Service Requests", icon: FileText, path: "/service-requests" },
     { label: "TC Directory", icon: Users, path: "/tc-directory" },
     { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
@@ -51,7 +54,7 @@ const NAV_ITEMS = {
   ],
 };
 
-export default function Sidebar({ userRole, collapsed, onToggle }) {
+export default function Sidebar({ userRole, collapsed, onToggle, userId }) {
   const location = useLocation();
   const items = NAV_ITEMS[userRole] || NAV_ITEMS.investor;
 
@@ -96,13 +99,16 @@ export default function Sidebar({ userRole, collapsed, onToggle }) {
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative",
                 active
                   ? "bg-sidebar-accent text-sidebar-primary"
                   : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}
             >
-              <Icon className={cn("w-5 h-5 shrink-0", active && "text-sidebar-primary")} />
+              <span className="relative">
+                <Icon className={cn("w-5 h-5 shrink-0", active && "text-sidebar-primary")} />
+                {item.path === "/messages" && <UnreadBadge userId={userId} />}
+              </span>
               {!collapsed && (
                 <span className="text-sm font-medium truncate">{item.label}</span>
               )}

@@ -20,6 +20,8 @@ import TCDirectory from "./pages/TCDirectory";
 import PMLProfilePage from "./pages/PMLProfilePage";
 import PMLDirectory from "./pages/PMLDirectory";
 import DealBoard from "./pages/DealBoard";
+import Messages from "./pages/Messages";
+import ServiceRequests from "./pages/ServiceRequests";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -78,6 +80,7 @@ const AuthenticatedApp = () => {
           <>
             <Route path="/admin/applications" element={<Applications />} />
             <Route path="/admin/members" element={<Members />} />
+            <Route path="/service-requests" element={<ServiceRequests />} />
             <Route path="/settings" element={<ComingSoon title="Platform Settings" />} />
             <Route path="/profile/tc" element={<TCProfilePage />} />
             <Route path="/profile/pml" element={<PMLProfilePage />} />
@@ -88,7 +91,8 @@ const AuthenticatedApp = () => {
         {user?.role === "tc" && (
           <>
             <Route path="/deal-board" element={<DealBoard />} />
-            <Route path="/messages" element={<ComingSoon title="Messages" />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/service-requests" element={<ServiceRequests />} />
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
             <Route path="/profile" element={<TCProfilePage />} />
           </>
@@ -100,7 +104,8 @@ const AuthenticatedApp = () => {
             <Route path="/deal-board" element={<DealBoard />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
             <Route path="/pml-directory" element={<PMLDirectory />} />
-            <Route path="/messages" element={<ComingSoon title="Messages" />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/service-requests" element={<ServiceRequests />} />
             <Route path="/profile" element={<InvestorProfilePage />} />
             <Route path="/profile/tc" element={<TCProfilePage />} />
             <Route path="/profile/pml" element={<PMLProfilePage />} />
@@ -111,7 +116,7 @@ const AuthenticatedApp = () => {
         {user?.role === "pml" && (
           <>
             <Route path="/pipeline" element={<ComingSoon title="Pipeline" />} />
-            <Route path="/messages" element={<ComingSoon title="Messages" />} />
+            <Route path="/messages" element={<Messages />} />
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
             <Route path="/profile" element={<PMLProfilePage />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
