@@ -17,6 +17,8 @@ import ComingSoon from "./pages/ComingSoon";
 import TCProfilePage from "./pages/TCProfilePage";
 import InvestorProfilePage from "./pages/InvestorProfilePage";
 import TCDirectory from "./pages/TCDirectory";
+import PMLProfilePage from "./pages/PMLProfilePage";
+import PMLDirectory from "./pages/PMLDirectory";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -73,6 +75,8 @@ const AuthenticatedApp = () => {
             <Route path="/admin/applications" element={<Applications />} />
             <Route path="/admin/members" element={<Members />} />
             <Route path="/settings" element={<ComingSoon title="Platform Settings" />} />
+            <Route path="/profile/tc" element={<TCProfilePage />} />
+            <Route path="/profile/pml" element={<PMLProfilePage />} />
           </>
         )}
 
@@ -91,10 +95,11 @@ const AuthenticatedApp = () => {
           <>
             <Route path="/deal-board" element={<ComingSoon title="Deal Board" />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
-            <Route path="/pml-directory" element={<ComingSoon title="PML Directory" />} />
+            <Route path="/pml-directory" element={<PMLDirectory />} />
             <Route path="/messages" element={<ComingSoon title="Messages" />} />
             <Route path="/profile" element={<InvestorProfilePage />} />
             <Route path="/profile/tc" element={<TCProfilePage />} />
+            <Route path="/profile/pml" element={<PMLProfilePage />} />
           </>
         )}
 
@@ -104,9 +109,11 @@ const AuthenticatedApp = () => {
             <Route path="/pipeline" element={<ComingSoon title="Pipeline" />} />
             <Route path="/messages" element={<ComingSoon title="Messages" />} />
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
-            <Route path="/profile" element={<ComingSoon title="My Profile" />} />
+            <Route path="/profile" element={<PMLProfilePage />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
+            <Route path="/pml-directory" element={<PMLDirectory />} />
             <Route path="/profile/tc" element={<TCProfilePage />} />
+            <Route path="/profile/pml" element={<PMLProfilePage />} />
           </>
         )}
 
