@@ -19,6 +19,7 @@ import InvestorProfilePage from "./pages/InvestorProfilePage";
 import TCDirectory from "./pages/TCDirectory";
 import PMLProfilePage from "./pages/PMLProfilePage";
 import PMLDirectory from "./pages/PMLDirectory";
+import DealBoard from "./pages/DealBoard";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -87,7 +88,7 @@ const AuthenticatedApp = () => {
         {/* TC routes */}
         {user?.role === "tc" && (
           <>
-            <Route path="/deal-board" element={<ComingSoon title="Deal Board" />} />
+            <Route path="/deal-board" element={<DealBoard />} />
             <Route path="/messages" element={<ComingSoon title="Messages" />} />
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
             <Route path="/profile" element={<TCProfilePage />} />
@@ -97,7 +98,7 @@ const AuthenticatedApp = () => {
         {/* Investor routes */}
         {user?.role === "investor" && (
           <>
-            <Route path="/deal-board" element={<ComingSoon title="Deal Board" />} />
+            <Route path="/deal-board" element={<DealBoard />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
             <Route path="/pml-directory" element={<PMLDirectory />} />
             <Route path="/messages" element={<ComingSoon title="Messages" />} />
