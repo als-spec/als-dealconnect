@@ -14,6 +14,9 @@ import Dashboard from "./pages/Dashboard";
 import Applications from "./pages/admin/Applications";
 import Members from "./pages/admin/Members";
 import ComingSoon from "./pages/ComingSoon";
+import TCProfilePage from "./pages/TCProfilePage";
+import InvestorProfilePage from "./pages/InvestorProfilePage";
+import TCDirectory from "./pages/TCDirectory";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -79,7 +82,7 @@ const AuthenticatedApp = () => {
             <Route path="/deal-board" element={<ComingSoon title="Deal Board" />} />
             <Route path="/messages" element={<ComingSoon title="Messages" />} />
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
-            <Route path="/profile" element={<ComingSoon title="My Profile" />} />
+            <Route path="/profile" element={<TCProfilePage />} />
           </>
         )}
 
@@ -87,10 +90,11 @@ const AuthenticatedApp = () => {
         {user?.role === "investor" && (
           <>
             <Route path="/deal-board" element={<ComingSoon title="Deal Board" />} />
-            <Route path="/tc-directory" element={<ComingSoon title="TC Directory" />} />
+            <Route path="/tc-directory" element={<TCDirectory />} />
             <Route path="/pml-directory" element={<ComingSoon title="PML Directory" />} />
             <Route path="/messages" element={<ComingSoon title="Messages" />} />
-            <Route path="/profile" element={<ComingSoon title="My Profile" />} />
+            <Route path="/profile" element={<InvestorProfilePage />} />
+            <Route path="/profile/tc" element={<TCProfilePage />} />
           </>
         )}
 
@@ -101,6 +105,8 @@ const AuthenticatedApp = () => {
             <Route path="/messages" element={<ComingSoon title="Messages" />} />
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
             <Route path="/profile" element={<ComingSoon title="My Profile" />} />
+            <Route path="/tc-directory" element={<TCDirectory />} />
+            <Route path="/profile/tc" element={<TCProfilePage />} />
           </>
         )}
 

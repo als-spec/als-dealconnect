@@ -43,6 +43,7 @@ const NAV_ITEMS = {
   pml: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/" },
     { label: "Pipeline", icon: ClipboardList, path: "/pipeline" },
+    { label: "TC Directory", icon: Users, path: "/tc-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "Analytics", icon: BarChart3, path: "/analytics" },
     { label: "My Profile", icon: DollarSign, path: "/profile" },
