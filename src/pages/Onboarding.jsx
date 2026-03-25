@@ -25,8 +25,17 @@ export default function Onboarding() {
   }, []);
 
   const loadUserState = async () => {
-    const user = await base44.auth.me();
-    // If user already has onboarding_step saved, resume from there
+    let user = null;
+    try {
+      user = await base44.auth.me();
+    } catch (e) {
+      setLoading(false);
+      return;
+    }
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     if (user.onboarding_step === "approved" || user.role === "admin") {
       navigate("/");
       return;
