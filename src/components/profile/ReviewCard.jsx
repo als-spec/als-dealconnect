@@ -1,7 +1,14 @@
 import StarRating from "../StarRating";
-import { Quote } from "lucide-react";
+
+const SUB_LABELS = [
+  { key: "communication_rating", label: "Communication" },
+  { key: "professionalism_rating", label: "Professionalism" },
+  { key: "accuracy_rating", label: "Accuracy" },
+  { key: "timeliness_rating", label: "Timeliness" },
+];
 
 export default function ReviewCard({ review }) {
+  const subRatings = SUB_LABELS.filter(s => review[s.key] > 0);
   return (
     <div className="bg-card rounded-xl border border-border p-5 hover:shadow-sm transition-shadow">
       <div className="flex items-start gap-3">
@@ -32,6 +39,16 @@ export default function ReviewCard({ review }) {
           )}
           {review.body && (
             <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{review.body}</p>
+          )}
+          {subRatings.length > 0 && (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 pt-3 border-t border-border/60">
+              {subRatings.map(s => (
+                <div key={s.key} className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{s.label}</span>
+                  <StarRating rating={review[s.key]} size="sm" />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

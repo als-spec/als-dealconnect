@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useSearchParams } from "react-router-dom";
+import ReviewForm from "../components/reviews/ReviewForm";
 import TCStatBar from "../components/profile/TCStatBar";
 import ServiceRateCard from "../components/profile/ServiceRateCard";
 import ReviewCard from "../components/profile/ReviewCard";
@@ -24,6 +25,7 @@ export default function TCProfilePage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   const isOwner = !profileUserId || profileUserId === currentUser?.id;
 
@@ -146,6 +148,11 @@ export default function TCProfilePage() {
                       <Button variant="outline" className="gap-2">
                         <MessageSquare className="w-4 h-4" /> Send Message
                       </Button>
+                      {currentUser?.role === "investor" && profile && (
+                        <Button variant="outline" className="gap-2" onClick={() => setShowReviewForm(true)}>
+                          <Award className="w-4 h-4" /> Leave Review
+                        </Button>
+                      )}
                       <GradientButton className="gap-2">Request Services</GradientButton>
                     </>
                   )}
@@ -248,5 +255,15 @@ export default function TCProfilePage() {
         </>
       )}
     </div>
+
+    {showReviewForm && profile && (
+      <ReviewForm
+        tcProfileId={profile.id}
+        tcName={displayName}
+        currentUser={currentUser}
+        onClose={() => setShowReviewForm(false)}
+        onSubmitted={load}
+      />
+    )}
   );
 }
