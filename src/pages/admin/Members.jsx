@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Users, Building2, MapPin } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ROLE_LABELS = {
@@ -19,6 +19,12 @@ const ROLE_COLORS = {
   investor: "bg-emerald-50 text-emerald-700 border-emerald-200",
   pml: "bg-amber-50 text-amber-700 border-amber-200",
   pending: "bg-gray-50 text-gray-700 border-gray-200",
+};
+
+const PLAN_LABELS = {
+  "price_1TFKRbBBAWoOZVYC1HY2RQ7i": "TC Basic — $15/mo",
+  "price_1TFKRcBBAWoOZVYCzDIdMCVO": "Investor — $29/mo",
+  "price_1TFKRcBBAWoOZVYCxOzErcSG": "PML — $29/mo",
 };
 
 export default function Members() {
@@ -95,8 +101,9 @@ export default function Members() {
               <tr className="border-b border-border bg-muted/30">
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Member</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Role</th>
-                <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Company</th>
-                <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Location</th>
+                <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Plan</th>
+                <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Sub Status</th>
+                <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden xl:table-cell">Next Billing</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Joined</th>
               </tr>
             </thead>
@@ -115,10 +122,17 @@ export default function Members() {
                     </Badge>
                   </td>
                   <td className="px-5 py-4 hidden md:table-cell text-sm text-muted-foreground">
-                    {m.company_name || "—"}
+                    {m.stripe_price_id ? PLAN_LABELS[m.stripe_price_id] || m.stripe_price_id : "—"}
                   </td>
-                  <td className="px-5 py-4 hidden md:table-cell text-sm text-muted-foreground">
-                    {m.state || "—"}
+                  <td className="px-5 py-4 hidden lg:table-cell">
+                    {m.stripe_status ? (
+                      <Badge variant="outline" className={m.stripe_status === "active" ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-xs" : "bg-gray-50 text-gray-600 border-gray-200 text-xs"}>
+                        {m.stripe_status}
+                      </Badge>
+                    ) : "—"}
+                  </td>
+                  <td className="px-5 py-4 hidden xl:table-cell text-sm text-muted-foreground">
+                    {m.stripe_next_billing ? new Date(m.stripe_next_billing).toLocaleDateString() : "—"}
                   </td>
                   <td className="px-5 py-4 hidden lg:table-cell text-sm text-muted-foreground">
                     {m.created_date ? new Date(m.created_date).toLocaleDateString() : "—"}
@@ -127,7 +141,7 @@ export default function Members() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center">
+                  <td colSpan={7} className="px-5 py-12 text-center">
                     <Users className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                     <p className="text-muted-foreground">No members found</p>
                   </td>

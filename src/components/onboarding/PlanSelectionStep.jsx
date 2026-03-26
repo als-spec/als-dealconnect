@@ -1,151 +1,124 @@
-import { Check } from "lucide-react";
+import { useState } from "react";
+import { Check, CreditCard, Loader2 } from "lucide-react";
 import GradientButton from "../GradientButton";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { base44 } from "@/api/base44Client";
 
 const PLANS = {
-  tc: [
-    {
-      id: "starter",
-      name: "Starter",
-      price: "$49",
-      period: "/mo",
-      features: ["Up to 5 active deals", "Basic profile listing", "Deal Board access", "Email support"],
-    },
-    {
-      id: "professional",
-      name: "Professional",
-      price: "$99",
-      period: "/mo",
-      popular: true,
-      features: ["Unlimited deals", "Featured profile listing", "Priority Deal Board placement", "Analytics dashboard", "Direct messaging", "Phone support"],
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      price: "$199",
-      period: "/mo",
-      features: ["Everything in Professional", "Custom branding", "API access", "Dedicated account manager", "Team seats", "White-glove onboarding"],
-    },
-  ],
-  investor: [
-    {
-      id: "starter",
-      name: "Starter",
-      price: "$39",
-      period: "/mo",
-      features: ["Browse TC Directory", "Up to 3 deal posts/mo", "Basic search filters", "Email support"],
-    },
-    {
-      id: "professional",
-      name: "Professional",
-      price: "$79",
-      period: "/mo",
-      popular: true,
-      features: ["Unlimited deal posts", "Advanced TC search & filters", "Direct TC messaging", "PML Directory access", "Investor dashboard", "Priority support"],
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      price: "$149",
-      period: "/mo",
-      features: ["Everything in Professional", "Bulk deal posting", "CRM integration", "Dedicated manager", "Team access", "Custom reports"],
-    },
-  ],
-  pml: [
-    {
-      id: "starter",
-      name: "Starter",
-      price: "$59",
-      period: "/mo",
-      features: ["Basic lending profile", "Receive deal inquiries", "Up to 10 active listings", "Email support"],
-    },
-    {
-      id: "professional",
-      name: "Professional",
-      price: "$119",
-      period: "/mo",
-      popular: true,
-      features: ["Featured lending profile", "Unlimited listings", "Pipeline dashboard", "Direct messaging", "Deal analytics", "Priority support"],
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      price: "$249",
-      period: "/mo",
-      features: ["Everything in Professional", "Portfolio analytics", "Automated matching", "API integrations", "White-label options", "Dedicated manager"],
-    },
-  ],
+  tc: {
+    name: "TC Basic Plan",
+    price: "$15",
+    priceId: "price_1TFKRbBBAWoOZVYC1HY2RQ7i",
+    features: [
+      "Full Deal Board access",
+      "Service request management",
+      "TC profile listing in directory",
+      "Direct messaging with investors",
+      "Analytics dashboard",
+      "Priority support",
+    ],
+  },
+  investor: {
+    name: "Investor Plan",
+    price: "$29",
+    priceId: "price_1TFKRcBBAWoOZVYCzDIdMCVO",
+    features: [
+      "Unlimited deal posts",
+      "TC Directory access",
+      "PML Directory access",
+      "Direct messaging",
+      "Investor dashboard & analytics",
+      "Deal match notifications",
+    ],
+  },
+  pml: {
+    name: "Private Money Lender Plan",
+    price: "$29",
+    priceId: "price_1TFKRcBBAWoOZVYCxOzErcSG",
+    features: [
+      "Featured PML profile listing",
+      "Unlimited deal inquiries",
+      "Pipeline dashboard",
+      "Direct messaging",
+      "Deal analytics",
+      "Priority support",
+    ],
+  },
 };
 
-export default function PlanSelectionStep({ memberType, selectedPlan, onSelect, onNext, onBack }) {
-  const plans = PLANS[memberType] || PLANS.investor;
+export default function PlanSelectionStep({ memberType, onBack, paymentError }) {
+  const [loading, setLoading] = useState(false);
+  const plan = PLANS[memberType] || PLANS.investor;
+
+  const handleCheckout = async () => {
+    setLoading(true);
+    const origin = window.location.origin;
+    const response = await base44.functions.invoke("createCheckoutSession", {
+      priceId: plan.priceId,
+      successUrl: `${origin}/onboarding?payment=success`,
+      cancelUrl: `${origin}/onboarding?payment=cancel`,
+    });
+    window.location.href = response.data.url;
+  };
 
   return (
     <div className="space-y-8">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-navy">Choose Your Plan</h2>
-        <p className="text-slate-text mt-1">Select the membership tier that fits your needs</p>
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-navy">Your Membership Plan</h2>
+        <p className="text-slate-text mt-1">Secure checkout powered by Stripe</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {plans.map((plan) => {
-          const selected = selectedPlan === plan.id;
-          return (
-            <div
-              key={plan.id}
-              onClick={() => onSelect(plan.id)}
-              className={cn(
-                "relative flex flex-col p-6 rounded-2xl border-2 cursor-pointer transition-all duration-200",
-                selected
-                  ? "border-teal shadow-lg shadow-teal/10"
-                  : "border-border bg-white hover:border-teal/40 hover:shadow-md",
-                plan.popular && !selected && "border-cyan/30"
-              )}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="gradient-primary text-white text-xs font-bold px-4 py-1 rounded-full">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-              <h3 className="text-lg font-bold text-navy">{plan.name}</h3>
-              <div className="mt-3 mb-5">
-                <span className="text-4xl font-extrabold text-navy">{plan.price}</span>
-                <span className="text-muted-foreground text-sm">{plan.period}</span>
-              </div>
-              <ul className="space-y-3 flex-1">
-                {plan.features.map((f, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-sm text-slate-text">
-                    <Check className="w-4 h-4 text-teal mt-0.5 shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-6">
-                {selected ? (
-                  <div className="gradient-primary text-white text-center py-2.5 rounded-lg font-semibold text-sm">
-                    Selected
-                  </div>
-                ) : (
-                  <div className="border-2 border-border text-navy text-center py-2.5 rounded-lg font-semibold text-sm hover:border-teal/40 transition-colors">
-                    Select Plan
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      {paymentError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-5 py-3 text-sm font-medium">
+          {paymentError}
+        </div>
+      )}
+
+      <div className="max-w-md mx-auto">
+        <div className="relative flex flex-col p-8 rounded-2xl border-2 border-teal shadow-lg shadow-teal/10 bg-white">
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+            <span className="gradient-primary text-white text-xs font-bold px-4 py-1 rounded-full">
+              Your Plan
+            </span>
+          </div>
+
+          <h3 className="text-xl font-bold text-navy">{plan.name}</h3>
+          <div className="mt-3 mb-6 flex items-end gap-1">
+            <span className="text-5xl font-extrabold text-navy">{plan.price}</span>
+            <span className="text-muted-foreground text-base mb-1">/month</span>
+          </div>
+
+          <ul className="space-y-3 flex-1 mb-8">
+            {plan.features.map((f, i) => (
+              <li key={i} className="flex items-start gap-3 text-sm text-slate-text">
+                <Check className="w-4 h-4 text-teal mt-0.5 shrink-0" />
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+
+          <GradientButton
+            onClick={handleCheckout}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3 text-base"
+          >
+            {loading ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Redirecting to Stripe...</>
+            ) : (
+              <><CreditCard className="w-4 h-4" /> Pay & Continue</>
+            )}
+          </GradientButton>
+
+          <p className="text-xs text-muted-foreground text-center mt-3">
+            Cancel anytime. Billed monthly. Secure payment via Stripe.
+          </p>
+        </div>
       </div>
 
-      <div className="flex justify-between pt-4">
+      <div className="flex justify-start pt-2">
         <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
           Back
         </Button>
-        <GradientButton onClick={onNext} disabled={!selectedPlan} className="px-10">
-          Continue to NDA
-        </GradientButton>
       </div>
     </div>
   );

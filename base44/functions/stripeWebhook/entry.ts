@@ -36,37 +36,27 @@ Deno.serve(async (req) => {
     try {
       const base44 = createClientFromRequest(req);
 
-      // Find the MemberApplication by email
-      const applications = await base44.asServiceRole.entities.MemberApplication.filter({
-        email: customerEmail,
-        status: 'pending',
-      });
-
-      if (applications.length === 0) {
-        console.log('No pending application found for email:', customerEmail);
-        return Response.json({ received: true });
+      // Retrieve subscription to get billing details
+      let nextBilling = null;
+      let subscriptionId = session.subscription;
+      if (subscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        nextBilling = new Date(subscription.current_period_end * 1000).toISOString();
       }
 
-      const application = applications[0];
-      const memberType = application.member_type;
-      const role = ROLE_MAP[memberType] || memberType;
-
-      // Approve the application
-      await base44.asServiceRole.entities.MemberApplication.update(application.id, {
-        status: 'approved',
-        reviewed_date: new Date().toISOString(),
-        admin_notes: 'Auto-approved via Stripe payment',
-      });
-
-      // Find the user by email and update their role + onboarding status
+      // Update user with stripe data and advance to NDA step
       const users = await base44.asServiceRole.entities.User.filter({ email: customerEmail });
       if (users.length > 0) {
         const user = users[0];
         await base44.asServiceRole.entities.User.update(user.id, {
-          role: role,
-          onboarding_step: 'approved',
+          stripe_customer_id: session.customer,
+          stripe_subscription_id: subscriptionId,
+          stripe_price_id: session.line_items?.data?.[0]?.price?.id || null,
+          stripe_next_billing: nextBilling,
+          stripe_status: 'active',
+          onboarding_step: 'nda',
         });
-        console.log(`User ${customerEmail} approved as ${role}`);
+        console.log(`Payment confirmed for ${customerEmail}, advanced to NDA step`);
       } else {
         console.log('No user found for email:', customerEmail);
       }

@@ -1,0 +1,50 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "tc",
+        "investor",
+        "pml",
+        "pending"
+      ],
+      "default": "pending"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "member_type": {
+      "type": "string"
+    },
+    "selected_plan": {
+      "type": "string"
+    },
+    "onboarding_step": {
+      "type": "string"
+    },
+    "stripe_customer_id": {
+      "type": "string"
+    },
+    "stripe_subscription_id": {
+      "type": "string"
+    },
+    "stripe_price_id": {
+      "type": "string"
+    },
+    "stripe_next_billing": {
+      "type": "string"
+    },
+    "stripe_status": {
+      "type": "string"
+    }
+  }
+}

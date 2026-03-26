@@ -8,16 +8,13 @@ import PlanSelectionStep from "../components/onboarding/PlanSelectionStep";
 import NDAStep from "../components/onboarding/NDAStep";
 import PendingApprovalStep from "../components/onboarding/PendingApprovalStep";
 
-const STRIPE_LINKS = {
-  tc: "https://buy.stripe.com/bJe14meBU6Yg9rq9CL4Vy00",
-  investor: "https://buy.stripe.com/7sY8wOalE96o0UUdT14Vy01",
-  pml: "https://buy.stripe.com/dRm5kC51keqIgTS7uD4Vy02",
-};
+
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState("registration");
   const [loading, setLoading] = useState(true);
+  const [paymentError, setPaymentError] = useState("");
   const [formData, setFormData] = useState({
     phone: "",
     company_name: "",
@@ -31,6 +28,13 @@ export default function Onboarding() {
   }, []);
 
   const loadUserState = async () => {
+    // Handle Stripe return URL params first
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get("payment");
+    if (paymentStatus) {
+      window.history.replaceState({}, "", "/onboarding");
+    }
+
     let user = null;
     try {
       user = await base44.auth.me();
@@ -46,15 +50,29 @@ export default function Onboarding() {
       navigate("/");
       return;
     }
+
+    setFormData({
+      phone: user.phone || "",
+      company_name: user.company_name || "",
+      state: user.state || "",
+      member_type: user.member_type || "",
+      selected_plan: user.selected_plan || "",
+    });
+
+    if (paymentStatus === "success") {
+      setStep("nda");
+      setLoading(false);
+      return;
+    }
+    if (paymentStatus === "cancel") {
+      setPaymentError("Payment was cancelled. Please try again to continue.");
+      setStep("plan_selection");
+      setLoading(false);
+      return;
+    }
+
     if (user.onboarding_step && user.onboarding_step !== "registration") {
       setStep(user.onboarding_step);
-      setFormData({
-        phone: user.phone || "",
-        company_name: user.company_name || "",
-        state: user.state || "",
-        member_type: user.member_type || "",
-        selected_plan: user.selected_plan || "",
-      });
     }
     setLoading(false);
   };
@@ -101,9 +119,6 @@ export default function Onboarding() {
       user_id: user.id,
     });
     setStep("pending_approval");
-    // Redirect to Stripe payment link
-    const link = STRIPE_LINKS[formData.member_type];
-    if (link) window.location.href = link;
   };
 
   const handleNDADecline = () => {
@@ -140,10 +155,8 @@ export default function Onboarding() {
           {step === "plan_selection" && (
             <PlanSelectionStep
               memberType={formData.member_type}
-              selectedPlan={formData.selected_plan}
-              onSelect={(plan) => updateForm({ selected_plan: plan })}
-              onNext={handlePlanNext}
               onBack={() => setStep("registration")}
+              paymentError={paymentError}
             />
           )}
           {step === "nda" && (

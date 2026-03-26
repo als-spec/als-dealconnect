@@ -17,8 +17,9 @@ Deno.serve(async (req) => {
       return users.find(u => u.id === id);
     };
 
-    // --- New member application → notify admins ---
+    // --- New member application → notify admins + confirm to applicant ---
     if (event?.entity_name === 'MemberApplication' && event?.type === 'create') {
+      // Notify admins
       const users = await getAllUsers();
       const admins = users.filter(u => u.role === 'admin');
       for (const admin of admins) {
@@ -36,6 +37,16 @@ Deno.serve(async (req) => {
            <p>Please log in to the admin panel to review and approve or reject it.</p>`
         );
       }
+      // Confirm to applicant
+      await sendEmail(
+        data.email,
+        'Application Received — ALS DealConnect',
+        `<p>Hi ${data.full_name},</p>
+         <p>Thank you for applying to <strong>ALS DealConnect</strong>! We've received your application and our team is reviewing it.</p>
+         <p>You'll receive an email notification once your application has been reviewed (typically within 1-2 business days).</p>
+         <p>If you have any questions in the meantime, don't hesitate to reach out to our support team.</p>
+         <p>Welcome to the ALS DealConnect community!</p>`
+      );
     }
 
     // --- Application status change → notify member ---

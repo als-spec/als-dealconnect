@@ -1,15 +1,21 @@
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, Menu } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 
-export default function TopBar({ user }) {
+export default function TopBar({ user, onMobileMenuToggle }) {
   const initials = user?.full_name
     ? user.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "?";
 
   return (
-    <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-6 sticky top-0 z-30">
+    <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 sticky top-0 z-30">
       <div className="flex items-center gap-3 flex-1 max-w-md">
+        <button
+          onClick={onMobileMenuToggle}
+          className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors mr-1"
+        >
+          <Menu className="w-5 h-5 text-muted-foreground" />
+        </button>
         <Search className="w-4 h-4 text-muted-foreground" />
         <Input
           placeholder="Search deals, members, messages..."

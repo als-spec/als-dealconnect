@@ -56,7 +56,7 @@ const NAV_ITEMS = {
   ],
 };
 
-export default function Sidebar({ userRole, collapsed, onToggle, userId }) {
+export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileOpen, onMobileClose }) {
   const location = useLocation();
   const items = NAV_ITEMS[userRole] || NAV_ITEMS.investor;
 
@@ -68,7 +68,11 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId }) {
     <aside
       className={cn(
         "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 z-40",
-        collapsed ? "w-[68px]" : "w-[260px]"
+        // Desktop
+        collapsed ? "md:w-[68px]" : "md:w-[260px]",
+        // Mobile: off-canvas, slides in when open
+        "w-[260px]",
+        mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}
     >
       {/* Header */}
