@@ -86,6 +86,7 @@ export default function TCProfilePage() {
   const state = profile?.state || profileUser?.state || currentUser?.state || "";
 
   return (
+    <>
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header card */}
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
@@ -265,5 +266,6 @@ export default function TCProfilePage() {
         onSubmitted={load}
       />
     )}
+    </>
   );
 }

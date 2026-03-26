@@ -8,6 +8,12 @@ import PlanSelectionStep from "../components/onboarding/PlanSelectionStep";
 import NDAStep from "../components/onboarding/NDAStep";
 import PendingApprovalStep from "../components/onboarding/PendingApprovalStep";
 
+const STRIPE_LINKS = {
+  tc: "https://buy.stripe.com/bJe14meBU6Yg9rq9CL4Vy00",
+  investor: "https://buy.stripe.com/7sY8wOalE96o0UUdT14Vy01",
+  pml: "https://buy.stripe.com/dRm5kC51keqIgTS7uD4Vy02",
+};
+
 export default function Onboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState("registration");
@@ -80,10 +86,10 @@ export default function Onboarding() {
     await base44.auth.updateMe({
       onboarding_step: "pending_approval",
     });
-    // Create the member application record
+    const user = await base44.auth.me();
     await base44.entities.MemberApplication.create({
-      email: (await base44.auth.me()).email,
-      full_name: (await base44.auth.me()).full_name,
+      email: user.email,
+      full_name: user.full_name,
       phone: formData.phone,
       company_name: formData.company_name,
       state: formData.state,
@@ -92,9 +98,12 @@ export default function Onboarding() {
       nda_accepted: true,
       nda_accepted_date: new Date().toISOString(),
       status: "pending",
-      user_id: (await base44.auth.me()).id,
+      user_id: user.id,
     });
     setStep("pending_approval");
+    // Redirect to Stripe payment link
+    const link = STRIPE_LINKS[formData.member_type];
+    if (link) window.location.href = link;
   };
 
   const handleNDADecline = () => {
