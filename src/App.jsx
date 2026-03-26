@@ -22,6 +22,9 @@ import PMLDirectory from "./pages/PMLDirectory";
 import DealBoard from "./pages/DealBoard";
 import Messages from "./pages/Messages";
 import ServiceRequests from "./pages/ServiceRequests";
+import LandingPage from "./pages/LandingPage";
+import PartnersPage from "./pages/PartnersPage";
+import AdminPartners from "./pages/admin/Partners";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -64,6 +67,8 @@ const AuthenticatedApp = () => {
   if (needsOnboarding) {
     return (
       <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/partners" element={<PartnersPage />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="*" element={<Navigate to="/onboarding" replace />} />
       </Routes>
@@ -72,14 +77,17 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/partners" element={<PartnersPage />} />
       <Route element={<Layout user={user} />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
 
         {/* Admin routes */}
         {user?.role === "admin" && (
           <>
             <Route path="/admin/applications" element={<Applications />} />
             <Route path="/admin/members" element={<Members />} />
+            <Route path="/admin/partners" element={<AdminPartners />} />
             <Route path="/service-requests" element={<ServiceRequests />} />
             <Route path="/settings" element={<ComingSoon title="Platform Settings" />} />
             <Route path="/profile/tc" element={<TCProfilePage />} />
@@ -128,7 +136,7 @@ const AuthenticatedApp = () => {
 
         <Route path="*" element={<PageNotFound />} />
       </Route>
-      <Route path="/onboarding" element={<Navigate to="/" replace />} />
+      <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 };

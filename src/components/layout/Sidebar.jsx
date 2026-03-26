@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   ClipboardList,
+  Handshake,
   MessageSquare,
   BarChart3,
   Settings,
@@ -21,13 +22,14 @@ import { base44 } from "@/api/base44Client";
 
 const NAV_ITEMS = {
   admin: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Applications", icon: ClipboardList, path: "/admin/applications" },
     { label: "Members", icon: Users, path: "/admin/members" },
+    { label: "Partners", icon: Handshake, path: "/admin/partners" },
     { label: "Settings", icon: Settings, path: "/settings" },
   ],
   tc: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
@@ -35,7 +37,7 @@ const NAV_ITEMS = {
     { label: "My Profile", icon: Briefcase, path: "/profile" },
   ],
   investor: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
     { label: "TC Directory", icon: Users, path: "/tc-directory" },
@@ -44,7 +46,7 @@ const NAV_ITEMS = {
     { label: "My Profile", icon: Building2, path: "/profile" },
   ],
   pml: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Pipeline", icon: ClipboardList, path: "/pipeline" },
     { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
     { label: "PML Directory", icon: Users, path: "/pml-directory" },
