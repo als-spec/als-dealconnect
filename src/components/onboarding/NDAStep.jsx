@@ -135,7 +135,7 @@ export default function NDAStep({ memberType, onAccept, onDecline, onBack }) {
             Decline
           </Button>
           <GradientButton onClick={onAccept} disabled={!agreed} className="px-10">
-            Accept & Submit
+            Accept & Continue
           </GradientButton>
         </div>
       </div>

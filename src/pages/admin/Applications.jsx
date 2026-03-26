@@ -183,7 +183,10 @@ export default function Applications() {
                 <div><span className="text-muted-foreground">State:</span> <span className="font-semibold text-navy">{selectedApp.state}</span></div>
                 <div><span className="text-muted-foreground">Type:</span> <span className="font-semibold text-navy">{TYPE_LABELS[selectedApp.member_type]}</span></div>
                 <div><span className="text-muted-foreground">Plan:</span> <span className="font-semibold text-navy capitalize">{selectedApp.selected_plan}</span></div>
-                <div><span className="text-muted-foreground">NDA:</span> <span className="font-semibold text-navy">{selectedApp.nda_accepted ? "Accepted" : "Not Accepted"}</span></div>
+                <div><span className="text-muted-foreground">NDA:</span> <span className="font-semibold text-navy">{selectedApp.nda_accepted ? `Accepted ${selectedApp.nda_accepted_date ? new Date(selectedApp.nda_accepted_date).toLocaleString() : ""}` : "Not Accepted"}</span></div>
+                <div className="col-span-2"><span className="text-muted-foreground">NDA Signer:</span> <span className="font-semibold text-navy">{selectedApp.nda_signer_name || "—"}</span></div>
+                <div><span className="text-muted-foreground">Non-Compete:</span> <span className="font-semibold text-navy">{selectedApp.non_compete_accepted ? `Accepted ${selectedApp.non_compete_accepted_date ? new Date(selectedApp.non_compete_accepted_date).toLocaleString() : ""}` : "Not Accepted"}</span></div>
+                <div><span className="text-muted-foreground">NC Signer:</span> <span className="font-semibold text-navy">{selectedApp.non_compete_signer_name || "—"}</span></div>
               </div>
 
               <div className="space-y-2">

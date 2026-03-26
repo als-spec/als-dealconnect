@@ -1,0 +1,83 @@
+{
+  "name": "MemberApplication",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "full_name": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "member_type": {
+      "type": "string",
+      "enum": [
+        "tc",
+        "investor",
+        "pml"
+      ]
+    },
+    "selected_plan": {
+      "type": "string"
+    },
+    "nda_accepted": {
+      "type": "boolean",
+      "default": false
+    },
+    "nda_accepted_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nda_signer_name": {
+      "type": "string"
+    },
+    "non_compete_accepted": {
+      "type": "boolean",
+      "default": false
+    },
+    "non_compete_accepted_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "non_compete_signer_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending"
+    },
+    "admin_notes": {
+      "type": "string"
+    },
+    "reviewed_by": {
+      "type": "string"
+    },
+    "reviewed_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "email",
+    "full_name",
+    "member_type",
+    "status"
+  ]
+}

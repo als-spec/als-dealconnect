@@ -40,6 +40,24 @@
     "onboarding_step": {
       "type": "string"
     },
+    "nda_accepted": {
+      "type": "boolean"
+    },
+    "nda_accepted_date": {
+      "type": "string"
+    },
+    "nda_signer_name": {
+      "type": "string"
+    },
+    "non_compete_accepted": {
+      "type": "boolean"
+    },
+    "non_compete_accepted_date": {
+      "type": "string"
+    },
+    "non_compete_signer_name": {
+      "type": "string"
+    },
     "stripe_customer_id": {
       "type": "string"
     },

@@ -6,6 +6,7 @@ import OnboardingProgress from "../components/onboarding/OnboardingProgress";
 import RegistrationStep from "../components/onboarding/RegistrationStep";
 import PlanSelectionStep from "../components/onboarding/PlanSelectionStep";
 import NDAStep from "../components/onboarding/NDAStep";
+import NonCompeteStep from "../components/onboarding/NonCompeteStep";
 import PendingApprovalStep from "../components/onboarding/PendingApprovalStep";
 
 
@@ -101,28 +102,51 @@ export default function Onboarding() {
   };
 
   const handleNDAAccept = async () => {
+    const user = await base44.auth.me();
+    await base44.auth.updateMe({
+      onboarding_step: "non_compete",
+      nda_accepted: true,
+      nda_accepted_date: new Date().toISOString(),
+      nda_signer_name: user.full_name,
+    });
+    setStep("non_compete");
+  };
+
+  const handleNonCompeteAccept = async () => {
+    const user = await base44.auth.me();
     await base44.auth.updateMe({
       onboarding_step: "pending_approval",
       member_status: "pending",
+      non_compete_accepted: true,
+      non_compete_accepted_date: new Date().toISOString(),
+      non_compete_signer_name: user.full_name,
     });
-    const user = await base44.auth.me();
+    const freshUser = await base44.auth.me();
     await base44.entities.MemberApplication.create({
-      email: user.email,
-      full_name: user.full_name,
+      email: freshUser.email,
+      full_name: freshUser.full_name,
       phone: formData.phone,
       company_name: formData.company_name,
       state: formData.state,
       member_type: formData.member_type,
       selected_plan: formData.selected_plan,
       nda_accepted: true,
-      nda_accepted_date: new Date().toISOString(),
+      nda_accepted_date: freshUser.nda_accepted_date || new Date().toISOString(),
+      nda_signer_name: freshUser.nda_signer_name || freshUser.full_name,
+      non_compete_accepted: true,
+      non_compete_accepted_date: new Date().toISOString(),
+      non_compete_signer_name: freshUser.full_name,
       status: "pending",
-      user_id: user.id,
+      user_id: freshUser.id,
     });
     setStep("pending_approval");
   };
 
   const handleNDADecline = () => {
+    setStep("registration");
+  };
+
+  const handleNonCompeteDecline = () => {
     setStep("registration");
   };
 
@@ -166,6 +190,13 @@ export default function Onboarding() {
               onAccept={handleNDAAccept}
               onDecline={handleNDADecline}
               onBack={() => setStep("plan_selection")}
+            />
+          )}
+          {step === "non_compete" && (
+            <NonCompeteStep
+              memberType={formData.member_type}
+              onAccept={handleNonCompeteAccept}
+              onDecline={handleNonCompeteDecline}
             />
           )}
           {step === "pending_approval" && (
