@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   Menu,
   FileText,
+  TrendingUp,
 } from "lucide-react";
 
 const NAV_ITEMS = {
@@ -27,12 +28,18 @@ const NAV_ITEMS = {
     { label: "Applications", icon: ClipboardList, path: "/admin/applications" },
     { label: "Members", icon: Users, path: "/admin/members" },
     { label: "Partners", icon: Handshake, path: "/admin/partners" },
+    { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
+    { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
+    { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
     { label: "Settings", icon: Settings, path: "/settings" },
   ],
   tc: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
+    { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
+    { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
+    { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "Analytics", icon: BarChart3, path: "/analytics" },
     { label: "My Profile", icon: Briefcase, path: "/profile" },
@@ -42,6 +49,7 @@ const NAV_ITEMS = {
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
     { label: "TC Directory", icon: Users, path: "/tc-directory" },
+    { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
     { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "My Profile", icon: Building2, path: "/profile" },
@@ -50,6 +58,7 @@ const NAV_ITEMS = {
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Pipeline", icon: ClipboardList, path: "/pipeline" },
     { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
+    { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
     { label: "PML Directory", icon: Users, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "Analytics", icon: BarChart3, path: "/analytics" },

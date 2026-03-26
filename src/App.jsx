@@ -25,6 +25,7 @@ import ServiceRequests from "./pages/ServiceRequests";
 import LandingPage from "./pages/LandingPage";
 import PartnersPage from "./pages/PartnersPage";
 import AdminPartners from "./pages/admin/Partners";
+import InvestorDirectory from "./pages/InvestorDirectory";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -92,6 +93,9 @@ const AuthenticatedApp = () => {
             <Route path="/settings" element={<ComingSoon title="Platform Settings" />} />
             <Route path="/profile/tc" element={<TCProfilePage />} />
             <Route path="/profile/pml" element={<PMLProfilePage />} />
+            <Route path="/tc-directory" element={<TCDirectory />} />
+            <Route path="/investor-directory" element={<InvestorDirectory />} />
+            <Route path="/pml-directory" element={<PMLDirectory />} />
           </>
         )}
 
@@ -104,6 +108,7 @@ const AuthenticatedApp = () => {
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
             <Route path="/profile" element={<TCProfilePage />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
+            <Route path="/investor-directory" element={<InvestorDirectory />} />
             <Route path="/pml-directory" element={<PMLDirectory />} />
             <Route path="/profile/pml" element={<PMLProfilePage />} />
           </>
@@ -114,6 +119,7 @@ const AuthenticatedApp = () => {
           <>
             <Route path="/deal-board" element={<DealBoard />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
+            <Route path="/investor-directory" element={<InvestorDirectory />} />
             <Route path="/pml-directory" element={<PMLDirectory />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/service-requests" element={<ServiceRequests />} />
@@ -131,6 +137,7 @@ const AuthenticatedApp = () => {
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
             <Route path="/profile" element={<PMLProfilePage />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
+            <Route path="/investor-directory" element={<InvestorDirectory />} />
             <Route path="/pml-directory" element={<PMLDirectory />} />
             <Route path="/profile/tc" element={<TCProfilePage />} />
             <Route path="/profile/pml" element={<PMLProfilePage />} />
