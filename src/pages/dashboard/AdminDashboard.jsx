@@ -53,8 +53,13 @@ export default function AdminDashboard({ user }) {
       status: action,
       reviewed_date: new Date().toISOString(),
     });
-    if (action === "approved" && app.user_id) {
-      await base44.entities.User.update(app.user_id, { role: app.member_type, onboarding_step: "approved" });
+    if (app.user_id) {
+      const userUpdate = { member_status: action };
+      if (action === "approved") {
+        userUpdate.role = app.member_type;
+        userUpdate.onboarding_step = "approved";
+      }
+      await base44.entities.User.update(app.user_id, userUpdate);
     }
     toast.success(`Application ${action}`);
     setProcessing(null);

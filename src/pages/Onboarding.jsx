@@ -103,6 +103,7 @@ export default function Onboarding() {
   const handleNDAAccept = async () => {
     await base44.auth.updateMe({
       onboarding_step: "pending_approval",
+      member_status: "pending",
     });
     const user = await base44.auth.me();
     await base44.entities.MemberApplication.create({

@@ -54,16 +54,13 @@ export default function Applications() {
       reviewed_date: new Date().toISOString(),
     });
 
-    // If approved, update the user's role
-    if (action === "approved" && app.user_id) {
-      const users = await base44.entities.User.filter({ id: app.user_id });
-      if (users.length > 0) {
-        await base44.entities.User.update(app.user_id, {
-          role: app.member_type,
-          onboarding_step: "approved",
-          approved_date: new Date().toISOString(),
-        });
+    if (app.user_id) {
+      const userUpdate = { member_status: action };
+      if (action === "approved") {
+        userUpdate.role = app.member_type;
+        userUpdate.onboarding_step = "approved";
       }
+      await base44.entities.User.update(app.user_id, userUpdate);
     }
 
     toast.success(`Application ${action === "approved" ? "approved" : "rejected"} successfully`);
@@ -122,17 +119,20 @@ export default function Applications() {
             className="bg-card rounded-2xl border border-border p-5 flex flex-col md:flex-row md:items-center gap-4 hover:shadow-sm transition-shadow"
           >
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-1">
-                <h3 className="text-base font-bold text-navy truncate">{app.full_name}</h3>
+              <div className="flex items-center gap-3 mb-1 flex-wrap">
+                <h3 className="text-base font-bold text-navy">{app.full_name}</h3>
+                <span className="text-sm text-muted-foreground">{app.email}</span>
                 <Badge variant="outline" className={cn("text-xs", STATUS_STYLES[app.status])}>
                   {app.status}
                 </Badge>
+                {app.nda_accepted && (
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">NDA ✓</Badge>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span>{TYPE_LABELS[app.member_type]}</span>
-                <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5" />{app.company_name}</span>
-                <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{app.state}</span>
-                <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" />{app.phone}</span>
+                <span className="font-medium text-navy">{TYPE_LABELS[app.member_type]}</span>
+                <span>Plan: <span className="capitalize font-medium">{app.selected_plan || "—"}</span></span>
+                <span>Applied: {app.created_date ? new Date(app.created_date).toLocaleDateString() : "—"}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">

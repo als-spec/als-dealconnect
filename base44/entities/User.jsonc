@@ -13,6 +13,15 @@
       ],
       "default": "pending"
     },
+    "member_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending"
+    },
     "phone": {
       "type": "string"
     },

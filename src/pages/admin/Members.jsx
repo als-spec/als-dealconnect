@@ -21,6 +21,12 @@ const ROLE_COLORS = {
   pending: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
+const STATUS_COLORS = {
+  pending: "bg-amber-50 text-amber-700 border-amber-200",
+  approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  rejected: "bg-red-50 text-red-700 border-red-200",
+};
+
 const PLAN_LABELS = {
   "price_1TFKRbBBAWoOZVYC1HY2RQ7i": "TC Basic — $15/mo",
   "price_1TFKRcBBAWoOZVYCzDIdMCVO": "Investor — $29/mo",
@@ -101,6 +107,7 @@ export default function Members() {
               <tr className="border-b border-border bg-muted/30">
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Member</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Role</th>
+                <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Plan</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Sub Status</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden xl:table-cell">Next Billing</th>
@@ -119,6 +126,11 @@ export default function Members() {
                   <td className="px-5 py-4">
                     <Badge variant="outline" className={cn("text-xs", ROLE_COLORS[m.role || "pending"])}>
                       {ROLE_LABELS[m.role || "pending"]}
+                    </Badge>
+                  </td>
+                  <td className="px-5 py-4">
+                    <Badge variant="outline" className={cn("text-xs capitalize", STATUS_COLORS[m.member_status || (m.role === "pending" ? "pending" : "approved")])}>
+                      {m.member_status || (m.role === "pending" ? "Pending" : "Approved")}
                     </Badge>
                   </td>
                   <td className="px-5 py-4 hidden md:table-cell text-sm text-muted-foreground">

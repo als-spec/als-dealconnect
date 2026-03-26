@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import Logo from "../Logo";
 import UnreadBadge from "./UnreadBadge";
+import { base44 } from "@/api/base44Client";
 import {
   LayoutDashboard,
   Users,
@@ -18,7 +20,6 @@ import {
   Menu,
   FileText,
 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 
 const NAV_ITEMS = {
   admin: [
@@ -59,6 +60,15 @@ const NAV_ITEMS = {
 export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileOpen, onMobileClose }) {
   const location = useLocation();
   const items = NAV_ITEMS[userRole] || NAV_ITEMS.investor;
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (userRole === "admin") {
+      base44.entities.MemberApplication.filter({ status: "pending" })
+        .then(apps => setPendingCount(apps.length))
+        .catch(() => {});
+    }
+  }, [userRole]);
 
   const handleLogout = () => {
     base44.auth.logout();
@@ -116,7 +126,12 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
                 {item.path === "/messages" && <UnreadBadge userId={userId} />}
               </span>
               {!collapsed && (
-                <span className="text-sm font-medium truncate">{item.label}</span>
+                <span className="text-sm font-medium truncate flex-1">{item.label}</span>
+              )}
+              {!collapsed && item.path === "/admin/applications" && pendingCount > 0 && (
+                <span className="ml-auto gradient-primary text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {pendingCount}
+                </span>
               )}
             </Link>
           );
