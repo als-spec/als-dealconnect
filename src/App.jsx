@@ -103,6 +103,9 @@ const AuthenticatedApp = () => {
             <Route path="/service-requests" element={<ServiceRequests />} />
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
             <Route path="/profile" element={<TCProfilePage />} />
+            <Route path="/tc-directory" element={<TCDirectory />} />
+            <Route path="/pml-directory" element={<PMLDirectory />} />
+            <Route path="/profile/pml" element={<PMLProfilePage />} />
           </>
         )}
 
