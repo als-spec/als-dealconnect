@@ -118,7 +118,10 @@ export default function PMLDashboard({ user }) {
 
         {/* Performance chart */}
         <div className="bg-card rounded-2xl border border-border p-6">
-          <h2 className="font-bold text-navy text-lg mb-4">Inquiry Volume</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="font-bold text-navy text-lg">Inquiry Volume</h2>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">Demo</span>
+          </div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={performanceData}>
               <defs>

@@ -157,7 +157,10 @@ export default function TCDashboard({ user }) {
       {/* Earnings chart + Recent reviews */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card rounded-2xl border border-border p-6">
-          <h2 className="font-bold text-navy text-lg mb-4">Earnings This Year</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="font-bold text-navy text-lg">Earnings This Year</h2>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">Demo</span>
+          </div>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={earningsData}>
               <defs>
