@@ -38,7 +38,25 @@ export default function AdminDashboard({ user }) {
       base44.entities.MessageThread.list(),
       base44.entities.Review.list('-created_date', 20),
     ]);
-    setApplications(apps);
+
+    // Synthesize pending entries for users with pending_approval step but no MemberApplication
+    const appUserIds = new Set(apps.map(a => a.user_id).filter(Boolean));
+    const pendingUsers = users.filter(
+      u => (u.onboarding_step === "pending_approval" || u.member_status === "pending") && !appUserIds.has(u.id)
+    );
+    const syntheticApps = pendingUsers.map(u => ({
+      id: "user_" + u.id,
+      user_id: u.id,
+      email: u.email,
+      full_name: u.full_name,
+      member_type: u.member_type || u.role,
+      company_name: u.company_name,
+      state: u.state,
+      status: "pending",
+      _synthetic: true,
+    }));
+
+    setApplications([...apps, ...syntheticApps]);
     setMembers(users.filter(u => u.role && u.role !== "admin" && u.role !== "pending"));
     setDeals(deals_);
     setMessages(threads);
@@ -49,10 +67,12 @@ export default function AdminDashboard({ user }) {
   const handleAction = async (appId, action) => {
     setProcessing(appId + action);
     const app = applications.find(a => a.id === appId);
-    await base44.entities.MemberApplication.update(appId, {
-      status: action,
-      reviewed_date: new Date().toISOString(),
-    });
+    if (!app._synthetic) {
+      await base44.entities.MemberApplication.update(appId, {
+        status: action,
+        reviewed_date: new Date().toISOString(),
+      });
+    }
     if (app.user_id) {
       const userUpdate = { member_status: action };
       if (action === "approved") {
