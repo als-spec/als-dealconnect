@@ -20,6 +20,7 @@ import {
   Menu,
   FileText,
   TrendingUp,
+  LifeBuoy,
 } from "lucide-react";
 
 const NAV_ITEMS = {
@@ -28,6 +29,7 @@ const NAV_ITEMS = {
     { label: "Applications", icon: ClipboardList, path: "/admin/applications" },
     { label: "Members", icon: Users, path: "/admin/members" },
     { label: "Partners", icon: Handshake, path: "/admin/partners" },
+    { label: "Support Tickets", icon: LifeBuoy, path: "/admin/support" },
     { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
     { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
     { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
@@ -42,6 +44,7 @@ const NAV_ITEMS = {
     { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "Analytics", icon: BarChart3, path: "/analytics" },
+    { label: "Support", icon: LifeBuoy, path: "/support" },
     { label: "My Profile", icon: Briefcase, path: "/profile" },
   ],
   investor: [
@@ -52,6 +55,7 @@ const NAV_ITEMS = {
     { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
     { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
+    { label: "Support", icon: LifeBuoy, path: "/support" },
     { label: "My Profile", icon: Building2, path: "/profile" },
   ],
   pml: [
@@ -62,6 +66,7 @@ const NAV_ITEMS = {
     { label: "PML Directory", icon: Users, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "Analytics", icon: BarChart3, path: "/analytics" },
+    { label: "Support", icon: LifeBuoy, path: "/support" },
     { label: "My Profile", icon: DollarSign, path: "/profile" },
   ],
 };

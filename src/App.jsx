@@ -26,6 +26,8 @@ import LandingPage from "./pages/LandingPage";
 import PartnersPage from "./pages/PartnersPage";
 import AdminPartners from "./pages/admin/Partners";
 import InvestorDirectory from "./pages/InvestorDirectory";
+import SupportTickets from "./pages/SupportTickets";
+import AdminSupportTickets from "./pages/admin/SupportTickets";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -90,6 +92,7 @@ const AuthenticatedApp = () => {
             <Route path="/admin/applications" element={<Applications />} />
             <Route path="/admin/members" element={<Members />} />
             <Route path="/admin/partners" element={<AdminPartners />} />
+            <Route path="/admin/support" element={<AdminSupportTickets />} />
             <Route path="/service-requests" element={<ServiceRequests />} />
             <Route path="/settings" element={<ComingSoon title="Platform Settings" />} />
             <Route path="/profile/tc" element={<TCProfilePage />} />
@@ -107,6 +110,7 @@ const AuthenticatedApp = () => {
             <Route path="/messages" element={<Messages />} />
             <Route path="/service-requests" element={<ServiceRequests />} />
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
+            <Route path="/support" element={<SupportTickets />} />
             <Route path="/profile" element={<TCProfilePage />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
             <Route path="/investor-directory" element={<InvestorDirectory />} />
@@ -124,6 +128,7 @@ const AuthenticatedApp = () => {
             <Route path="/pml-directory" element={<PMLDirectory />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/service-requests" element={<ServiceRequests />} />
+            <Route path="/support" element={<SupportTickets />} />
             <Route path="/profile" element={<InvestorProfilePage />} />
             <Route path="/profile/tc" element={<TCProfilePage />} />
             <Route path="/profile/pml" element={<PMLProfilePage />} />
@@ -136,6 +141,7 @@ const AuthenticatedApp = () => {
             <Route path="/pipeline" element={<ComingSoon title="Pipeline" />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
+            <Route path="/support" element={<SupportTickets />} />
             <Route path="/profile" element={<PMLProfilePage />} />
             <Route path="/tc-directory" element={<TCDirectory />} />
             <Route path="/investor-directory" element={<InvestorDirectory />} />
