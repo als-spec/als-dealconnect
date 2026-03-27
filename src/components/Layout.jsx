@@ -28,7 +28,7 @@ export default function Layout({ user }) {
       />
       <div className={cn(
         "transition-all duration-300",
-        "md:" + (collapsed ? "ml-[68px]" : "ml-[260px]")
+        collapsed ? "md:ml-[68px]" : "md:ml-[260px]"
       )}>
         <TopBar user={user} onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} />
         <main className="p-4 md:p-6">
