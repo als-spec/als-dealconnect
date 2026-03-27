@@ -9,6 +9,7 @@ import PlanSelectionStep from "../components/onboarding/PlanSelectionStep";
 import NDAStep from "../components/onboarding/NDAStep";
 import NonCompeteStep from "../components/onboarding/NonCompeteStep";
 import PendingApprovalStep from "../components/onboarding/PendingApprovalStep";
+// Registration step removed per spec — flow: member_type → plan → stripe → nda → non_compete → pending
 
 
 
@@ -18,9 +19,6 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(true);
   const [paymentError, setPaymentError] = useState("");
   const [formData, setFormData] = useState({
-    phone: "",
-    company_name: "",
-    state: "",
     member_type: "",
     selected_plan: "",
   });
@@ -55,9 +53,6 @@ export default function Onboarding() {
     }
 
     setFormData({
-      phone: user.phone || "",
-      company_name: user.company_name || "",
-      state: user.state || "",
       member_type: preselectedType || user.member_type || "",
       selected_plan: user.selected_plan || "",
     });
@@ -101,17 +96,6 @@ export default function Onboarding() {
   const handleMemberTypeNext = async () => {
     await base44.auth.updateMe({
       member_type: formData.member_type,
-      onboarding_step: "registration",
-    });
-    setStep("registration");
-  };
-
-  const handleRegistrationNext = async () => {
-    await base44.auth.updateMe({
-      phone: formData.phone,
-      company_name: formData.company_name,
-      state: formData.state,
-      member_type: formData.member_type,
       onboarding_step: "plan_selection",
     });
     setStep("plan_selection");
@@ -138,27 +122,25 @@ export default function Onboarding() {
 
   const handleNonCompeteAccept = async () => {
     const user = await base44.auth.me();
+    const now = new Date().toISOString();
     await base44.auth.updateMe({
       onboarding_step: "pending_approval",
       member_status: "pending",
       non_compete_accepted: true,
-      non_compete_accepted_date: new Date().toISOString(),
+      non_compete_accepted_date: now,
       non_compete_signer_name: user.full_name,
     });
     const freshUser = await base44.auth.me();
     await base44.entities.MemberApplication.create({
       email: freshUser.email,
       full_name: freshUser.full_name,
-      phone: formData.phone,
-      company_name: formData.company_name,
-      state: formData.state,
       member_type: formData.member_type,
       selected_plan: formData.selected_plan,
       nda_accepted: true,
-      nda_accepted_date: freshUser.nda_accepted_date || new Date().toISOString(),
+      nda_accepted_date: freshUser.nda_accepted_date || now,
       nda_signer_name: freshUser.nda_signer_name || freshUser.full_name,
       non_compete_accepted: true,
-      non_compete_accepted_date: new Date().toISOString(),
+      non_compete_accepted_date: now,
       non_compete_signer_name: freshUser.full_name,
       status: "pending",
       user_id: freshUser.id,
@@ -203,17 +185,10 @@ export default function Onboarding() {
               onNext={handleMemberTypeNext}
             />
           )}
-          {step === "registration" && (
-            <RegistrationStep
-              formData={formData}
-              onChange={updateForm}
-              onNext={handleRegistrationNext}
-            />
-          )}
           {(step === "plan_selection" || step === "checkout") && (
             <PlanSelectionStep
               memberType={formData.member_type}
-              onBack={() => setStep("registration")}
+              onBack={() => setStep("member_type")}
               paymentError={paymentError}
             />
           )}
