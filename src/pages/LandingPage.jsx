@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
 import { ShieldCheck, TrendingUp, Award, DollarSign, ArrowRight } from "lucide-react";
 
@@ -47,6 +48,12 @@ export default function LandingPage() {
             <Link to="/partners" className="text-sm font-semibold text-slate-text hover:text-teal transition-colors">
               Partners
             </Link>
+            <button
+              onClick={() => base44.auth.redirectToLogin()}
+              className="text-sm font-semibold text-navy border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors"
+            >
+              Sign In
+            </button>
             <Link
               to="/onboarding"
               className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
