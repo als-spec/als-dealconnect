@@ -6,14 +6,6 @@ const TYPE_LABELS = {
   pml: "Private Money Lender",
 };
 
-const TYPE_LABELS = {
-  tc: "Transaction Coordinator",
-  investor: "Investor / Agent",
-  pml: "Private Money Lender",
-};
-
-
-
 export default function PendingApprovalStep({ memberType, selectedPlan }) {
   return (
     <div className="text-center space-y-8 py-8">
