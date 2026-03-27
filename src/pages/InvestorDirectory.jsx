@@ -23,11 +23,13 @@ export default function InvestorDirectory() {
   const load = async () => {
     setLoading(true);
     const all = await base44.entities.InvestorProfile.filter({ is_published: true });
-    const users = await base44.entities.User.list();
-    const map = {};
-    users.forEach((u) => { map[u.id] = u; });
+    try {
+      const users = await base44.entities.User.list();
+      const map = {};
+      users.forEach((u) => { map[u.id] = u; });
+      setUserMap(map);
+    } catch {}
     setProfiles(all);
-    setUserMap(map);
     setLoading(false);
   };
 

@@ -55,10 +55,12 @@ export default function TCDirectory() {
     setProfiles(tcProfiles);
 
     if (tcProfiles.length > 0) {
-      const users = await base44.entities.User.list();
-      const map = {};
-      users.forEach((u) => { map[u.id] = u; });
-      setUserMap(map);
+      try {
+        const users = await base44.entities.User.list();
+        const map = {};
+        users.forEach((u) => { map[u.id] = u; });
+        setUserMap(map);
+      } catch {}
     }
     setLoading(false);
   };
