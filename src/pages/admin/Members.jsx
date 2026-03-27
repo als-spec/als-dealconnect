@@ -163,8 +163,8 @@ export default function Members() {
                     </Badge>
                   </td>
                   <td className="px-5 py-4">
-                    <Badge variant="outline" className={cn("text-xs capitalize", STATUS_COLORS[m.member_status || (m.role === "pending" ? "pending" : "approved")])}>
-                      {m.member_status || (m.role === "pending" ? "Pending" : "Approved")}
+                    <Badge variant="outline" className={cn("text-xs capitalize", STATUS_COLORS[m.member_status || "pending"])}>
+                      {m.member_status || "Pending"}
                     </Badge>
                   </td>
                   <td className="px-5 py-4 hidden md:table-cell text-sm text-muted-foreground">

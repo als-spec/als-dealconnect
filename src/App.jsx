@@ -61,8 +61,10 @@ const AuthenticatedApp = () => {
     }
   }
 
-  // Only admin users or users with onboarding_step === "approved" can access the app
-  const needsOnboarding = user?.role !== "admin" && user?.onboarding_step !== "approved";
+  // Only admin users or fully approved members (valid role + onboarding complete) can access the app
+  const validMemberRoles = ["tc", "investor", "pml", "admin"];
+  const hasValidRole = validMemberRoles.includes(user?.role);
+  const needsOnboarding = !hasValidRole || (user?.role !== "admin" && user?.onboarding_step !== "approved");
 
   if (needsOnboarding) {
     return (
