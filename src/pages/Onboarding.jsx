@@ -166,12 +166,14 @@ export default function Onboarding() {
     setStep("pending_approval");
   };
 
-  const handleNDADecline = () => {
-    setStep("registration");
+  const handleNDADecline = async () => {
+    await base44.auth.updateMe({ onboarding_step: "member_type" });
+    setStep("member_type");
   };
 
-  const handleNonCompeteDecline = () => {
-    setStep("registration");
+  const handleNonCompeteDecline = async () => {
+    await base44.auth.updateMe({ onboarding_step: "member_type" });
+    setStep("member_type");
   };
 
   if (loading) {

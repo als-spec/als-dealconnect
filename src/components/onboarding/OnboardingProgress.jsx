@@ -11,7 +11,9 @@ const STEPS = [
 ];
 
 export default function OnboardingProgress({ currentStep }) {
-  const currentIndex = STEPS.findIndex((s) => s.key === currentStep);
+  // treat "checkout" as the same position as "plan_selection"
+  const normalizedStep = currentStep === "checkout" ? "plan_selection" : currentStep;
+  const currentIndex = STEPS.findIndex((s) => s.key === normalizedStep);
 
   return (
     <div className="flex items-center justify-center gap-1 mb-10">
