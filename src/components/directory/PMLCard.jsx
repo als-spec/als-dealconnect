@@ -63,7 +63,7 @@ export default function PMLCard({ profile, user }) {
 
       {/* Loan type tags */}
       {loanTypes.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="flex flex-wrap gap-1.5 mb-3">
           {loanTypes.map((t) => (
             <span key={t} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan/10 text-cyan border border-cyan/20">{t}</span>
           ))}
@@ -73,9 +73,32 @@ export default function PMLCard({ profile, user }) {
         </div>
       )}
 
+      {/* Property types with teal checkmarks */}
+      {profile?.property_types?.length > 0 && (
+        <div className="mb-3 space-y-1">
+          {profile.property_types.slice(0, 3).map((pt) => (
+            <div key={pt} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CheckCircle2 className="w-3 h-3 text-teal shrink-0" />{pt}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Geographic markets as teal pills */}
+      {profile?.geographic_markets?.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {profile.geographic_markets.slice(0, 3).map((m) => (
+            <span key={m} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-teal/10 text-teal border border-teal/20">{m}</span>
+          ))}
+          {profile.geographic_markets.length > 3 && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-muted text-muted-foreground">+{profile.geographic_markets.length - 3}</span>
+          )}
+        </div>
+      )}
+
       <div className="mt-auto">
         <Link to={`/profile/pml?id=${profile.user_id}`}>
-          <GradientButton className="w-full text-sm py-2">View Profile</GradientButton>
+          <GradientButton className="w-full text-sm py-2">Submit a Deal</GradientButton>
         </Link>
       </div>
     </div>

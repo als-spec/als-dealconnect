@@ -48,8 +48,8 @@ export default function TCCard({ profile, user }) {
       {/* Rating */}
       {(profile?.average_rating || 0) > 0 && (
         <div className="flex items-center gap-2 mb-3">
-          <StarRating rating={profile.average_rating} size="sm" showValue />
-          <span className="text-xs text-muted-foreground">({profile.review_count || 0})</span>
+          <StarRating rating={profile.average_rating} size="sm" showValue className="text-teal" />
+          <span className="text-xs text-muted-foreground">({profile.review_count || 0} reviews)</span>
         </div>
       )}
 
@@ -69,9 +69,17 @@ export default function TCCard({ profile, user }) {
         </div>
       )}
 
+      {/* Service Rates */}
+      {(profile?.rate_residential || profile?.rate_creative_finance) && (
+        <div className="mb-4 text-xs text-muted-foreground space-y-1">
+          {profile.rate_residential && <div>Residential: <span className="font-semibold text-navy">{profile.rate_residential}</span></div>}
+          {profile.rate_creative_finance && <div>Creative Finance: <span className="font-semibold text-navy">{profile.rate_creative_finance}</span></div>}
+        </div>
+      )}
+
       <div className="mt-auto flex gap-2">
         <Link to={`/profile/tc?id=${profile.user_id}`} className="flex-1">
-          <GradientButton className="w-full text-sm py-2">View Profile</GradientButton>
+          <GradientButton className="w-full text-sm py-2">Request Services</GradientButton>
         </Link>
       </div>
     </div>
