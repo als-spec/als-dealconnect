@@ -34,8 +34,11 @@ export default function Messages() {
     const u = await base44.auth.me();
     setUser(u);
     currentUser.current = u;
-    const users = await base44.entities.User.list();
-    setAllUsers(users.filter(usr => usr.id !== u.id));
+    try {
+      const users = await base44.entities.User.list();
+      setAllUsers(users.filter(usr => usr.id !== u.id));
+    } catch {}
+    
     await loadThreads(u);
   };
 
