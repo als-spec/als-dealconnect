@@ -61,9 +61,8 @@ const AuthenticatedApp = () => {
     }
   }
 
-  // Check if user needs onboarding
-  const needsOnboarding = !user?.role || user.role === "pending" ||
-    (user.onboarding_step && user.onboarding_step !== "approved" && user.role !== "admin");
+  // Only admin users or users with onboarding_step === "approved" can access the app
+  const needsOnboarding = user?.role !== "admin" && user?.onboarding_step !== "approved";
 
   if (needsOnboarding) {
     return (
