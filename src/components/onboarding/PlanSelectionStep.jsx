@@ -57,6 +57,8 @@ export default function PlanSelectionStep({ memberType, onBack, paymentError }) 
       priceId: plan.priceId,
       successUrl: `${origin}/onboarding?payment=success`,
       cancelUrl: `${origin}/onboarding?payment=cancel`,
+      memberType,
+      planName: plan.name,
     });
     window.location.href = response.data.url;
   };

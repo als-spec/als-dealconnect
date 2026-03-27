@@ -63,12 +63,26 @@ export default function Onboarding() {
     });
 
     if (paymentStatus === "success") {
+      // Verify session server-side before advancing
+      const sessionId = urlParams.get("session_id");
+      if (sessionId) {
+        try {
+          const res = await base44.functions.invoke("verifyCheckoutSession", { sessionId });
+          if (res.data?.success) {
+            setStep("nda");
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          // fall through to normal step load
+        }
+      }
       setStep("nda");
       setLoading(false);
       return;
     }
     if (paymentStatus === "cancel") {
-      setPaymentError("Payment was cancelled. Please try again to continue.");
+      setPaymentError("Payment was not completed. Please try again to continue.");
       setStep("plan_selection");
       setLoading(false);
       return;
@@ -108,7 +122,7 @@ export default function Onboarding() {
       selected_plan: formData.selected_plan,
       onboarding_step: "checkout",
     });
-    setStep("plan_selection");
+    setStep("checkout");
   };
 
   const handleNDAAccept = async () => {
@@ -188,7 +202,13 @@ export default function Onboarding() {
             />
           )}
           {step === "registration" && (
-
+            <RegistrationStep
+              formData={formData}
+              onChange={updateForm}
+              onNext={handleRegistrationNext}
+            />
+          )}
+          {(step === "plan_selection" || step === "checkout") && (
             <PlanSelectionStep
               memberType={formData.member_type}
               onBack={() => setStep("registration")}
