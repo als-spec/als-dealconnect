@@ -5,6 +5,7 @@ import { ShieldCheck, TrendingUp, Award, DollarSign, ArrowRight } from "lucide-r
 const MEMBER_CARDS = [
   {
     role: "Transaction Coordinator",
+    type: "tc",
     icon: "📋",
     color: "from-teal to-cyan",
     tags: ["Creative Finance", "Fix & Flip", "DSCR", "Subject-To"],
@@ -12,6 +13,7 @@ const MEMBER_CARDS = [
   },
   {
     role: "Investor / Agent",
+    type: "investor",
     icon: "🏗️",
     color: "from-cyan to-blue-400",
     tags: ["Deal Flow", "TC Matching", "Private Lending", "Closings"],
@@ -19,6 +21,7 @@ const MEMBER_CARDS = [
   },
   {
     role: "Private Money Lender",
+    type: "pml",
     icon: "💼",
     color: "from-teal to-green-400",
     tags: ["Bridge Loans", "Fix & Flip", "DSCR", "Ground-Up"],
@@ -74,16 +77,16 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/onboarding"
+              to="/onboarding?type=tc"
               className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
             >
-              Start Your Transaction <ArrowRight className="w-4 h-4" />
+              I'm a TC <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              to="/onboarding"
+              to="/onboarding?type=investor"
               className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
             >
-              Join as a Member <ArrowRight className="w-4 h-4" />
+              I'm an Investor or Lender <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -127,7 +130,7 @@ export default function LandingPage() {
                     ))}
                   </div>
                   <Link
-                    to="/onboarding"
+                    to={`/onboarding?type=${card.type}`}
                     className="gradient-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition-all inline-flex items-center gap-2 w-full justify-center"
                   >
                     Join as {card.role.split(" ")[0]} <ArrowRight className="w-3.5 h-3.5" />

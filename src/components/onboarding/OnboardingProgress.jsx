@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 
 const STEPS = [
+  { key: "member_type", label: "Role" },
   { key: "registration", label: "Profile" },
   { key: "plan_selection", label: "Plan" },
   { key: "nda", label: "NDA" },

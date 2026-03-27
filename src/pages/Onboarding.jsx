@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
 import OnboardingProgress from "../components/onboarding/OnboardingProgress";
+import MemberTypeStep from "../components/onboarding/MemberTypeStep";
 import RegistrationStep from "../components/onboarding/RegistrationStep";
 import PlanSelectionStep from "../components/onboarding/PlanSelectionStep";
 import NDAStep from "../components/onboarding/NDAStep";
@@ -13,7 +14,7 @@ import PendingApprovalStep from "../components/onboarding/PendingApprovalStep";
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const [step, setStep] = useState("registration");
+  const [step, setStep] = useState("member_type");
   const [loading, setLoading] = useState(true);
   const [paymentError, setPaymentError] = useState("");
   const [formData, setFormData] = useState({
@@ -31,8 +32,9 @@ export default function Onboarding() {
   const loadUserState = async () => {
     // Handle Stripe return URL params first
     const urlParams = new URLSearchParams(window.location.search);
+    const preselectedType = urlParams.get("type");
     const paymentStatus = urlParams.get("payment");
-    if (paymentStatus) {
+    if (paymentStatus || preselectedType) {
       window.history.replaceState({}, "", "/onboarding");
     }
 
@@ -56,7 +58,7 @@ export default function Onboarding() {
       phone: user.phone || "",
       company_name: user.company_name || "",
       state: user.state || "",
-      member_type: user.member_type || "",
+      member_type: preselectedType || user.member_type || "",
       selected_plan: user.selected_plan || "",
     });
 
@@ -72,7 +74,7 @@ export default function Onboarding() {
       return;
     }
 
-    if (user.onboarding_step && user.onboarding_step !== "registration") {
+    if (user.onboarding_step && user.onboarding_step !== "member_type") {
       setStep(user.onboarding_step);
     }
     setLoading(false);
@@ -80,6 +82,14 @@ export default function Onboarding() {
 
   const updateForm = (updates) => {
     setFormData((prev) => ({ ...prev, ...updates }));
+  };
+
+  const handleMemberTypeNext = async () => {
+    await base44.auth.updateMe({
+      member_type: formData.member_type,
+      onboarding_step: "registration",
+    });
+    setStep("registration");
   };
 
   const handleRegistrationNext = async () => {
@@ -96,9 +106,9 @@ export default function Onboarding() {
   const handlePlanNext = async () => {
     await base44.auth.updateMe({
       selected_plan: formData.selected_plan,
-      onboarding_step: "nda",
+      onboarding_step: "checkout",
     });
-    setStep("nda");
+    setStep("plan_selection");
   };
 
   const handleNDAAccept = async () => {
@@ -170,14 +180,15 @@ export default function Onboarding() {
         <OnboardingProgress currentStep={step} />
 
         <div className="bg-card rounded-2xl border border-border shadow-sm p-6 md:p-10">
-          {step === "registration" && (
-            <RegistrationStep
-              data={formData}
-              onUpdate={updateForm}
-              onNext={handleRegistrationNext}
+          {step === "member_type" && (
+            <MemberTypeStep
+              selected={formData.member_type}
+              onSelect={(val) => updateForm({ member_type: val })}
+              onNext={handleMemberTypeNext}
             />
           )}
-          {step === "plan_selection" && (
+          {step === "registration" && (
+
             <PlanSelectionStep
               memberType={formData.member_type}
               onBack={() => setStep("registration")}
