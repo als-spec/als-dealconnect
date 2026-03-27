@@ -49,12 +49,15 @@ export default function MatchCard({ application, tcProfile, onUpdate }) {
       {/* Match Score */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-muted-foreground">Match Confidence</span>
+          <span className="text-xs text-muted-foreground">AI Match Score</span>
           <span className="text-xs font-bold gradient-primary-text">{score}%</span>
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div className="h-full gradient-primary rounded-full transition-all duration-500" style={{ width: gradientWidth }} />
         </div>
+        {application.ai_rationale && (
+          <p className="text-xs text-muted-foreground mt-1.5 italic leading-relaxed">{application.ai_rationale}</p>
+        )}
       </div>
 
       {/* Message */}

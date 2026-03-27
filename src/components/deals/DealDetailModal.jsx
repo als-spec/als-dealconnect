@@ -18,11 +18,29 @@ export default function DealDetailModal({ deal, open, onClose, userRole, userId,
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [matchScore, setMatchScore] = useState(null);
 
   const handleApply = async () => {
     if (!message.trim()) return;
     setSubmitting(true);
-    const score = Math.floor(Math.random() * 25) + 70; // 70–95 match score
+
+    // Get AI match score
+    let score = 75;
+    let rationale = null;
+    try {
+      let tcProfile = null;
+      if (tcProfileId) {
+        const profiles = await base44.entities.TCProfile.filter({ user_id: userId });
+        tcProfile = profiles[0] || null;
+      }
+      const res = await base44.functions.invoke('aiMatchScore', { deal, tcProfile, message });
+      score = res.data?.score ?? 75;
+      rationale = res.data?.rationale ?? null;
+    } catch (e) {
+      // fallback to default
+    }
+    setMatchScore({ score, rationale });
+
     await base44.entities.DealApplication.create({
       deal_id: deal.id,
       tc_id: userId,
@@ -30,6 +48,7 @@ export default function DealDetailModal({ deal, open, onClose, userRole, userId,
       tc_profile_id: tcProfileId || "",
       message,
       match_score: score,
+      ai_rationale: rationale,
       status: "pending",
     });
     // Move deal to in_review if still open
@@ -124,7 +143,7 @@ export default function DealDetailModal({ deal, open, onClose, userRole, userId,
                   <div className="flex gap-3 justify-end">
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
                     <GradientButton onClick={handleApply} disabled={submitting || !message.trim()}>
-                      {submitting ? "Submitting…" : "Submit Interest"}
+                      {submitting ? "Calculating AI Match…" : "Submit Interest"}
                     </GradientButton>
                   </div>
                 </div>
