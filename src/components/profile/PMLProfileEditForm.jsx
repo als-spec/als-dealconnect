@@ -8,7 +8,7 @@ import GradientButton from "../GradientButton";
 import { Button } from "@/components/ui/button";
 import { Plus, X } from "lucide-react";
 
-const LOAN_TYPES = ["Bridge","Fix & Flip","DSCR","Ground-Up Construction","Short-Term Rental","Multi-Family","Mixed-Use","Cash-Out Refi","New Construction","Land"];
+const LOAN_TYPES = ["Bridge","Fix & Flip","DSCR","Ground-Up Construction","Short-Term Rental","Multi-Family","Mixed-Use","Cash-Out Refi","New Construction","Land","Creative Finance","Sub-To","Wraps","Seller Finance","Cash"];
 const PROPERTY_TYPES = ["SFR","Multi-Family 2–4","Multi-Family 5+","Commercial","Mixed-Use","Land (case by case)"];
 const US_STATES = ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"];
 
