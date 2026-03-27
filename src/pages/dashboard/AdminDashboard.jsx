@@ -61,6 +61,21 @@ export default function AdminDashboard({ user }) {
       }
       await base44.entities.User.update(app.user_id, userUpdate);
     }
+    try {
+      if (action === "approved") {
+        await base44.integrations.Core.SendEmail({
+          to: app.email,
+          subject: "Welcome to ALS DealConnect — Your Application is Approved!",
+          body: `Hi ${app.full_name},\n\nGreat news! Your application to join ALS DealConnect as a ${TYPE_LABELS[app.member_type]} has been approved. You can now log in and access the platform.\n\nWelcome aboard!\n\nThe ALS DealConnect Team`,
+        });
+      } else {
+        await base44.integrations.Core.SendEmail({
+          to: app.email,
+          subject: "ALS DealConnect — Application Update",
+          body: `Hi ${app.full_name},\n\nThank you for applying to ALS DealConnect. After reviewing your application, we are unable to approve your membership at this time.\n\nThe ALS DealConnect Team`,
+        });
+      }
+    } catch (e) {}
     toast.success(`Application ${action}`);
     setProcessing(null);
     load();
