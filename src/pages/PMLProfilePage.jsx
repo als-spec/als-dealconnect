@@ -39,8 +39,12 @@ export default function PMLProfilePage() {
     const profiles = await base44.entities.PMLProfile.filter({ user_id: targetId });
     if (profiles.length > 0) setProfile(profiles[0]);
 
-    const users = await base44.entities.User.filter({ id: targetId });
-    if (users.length > 0) setProfileUser(users[0]);
+    if (!profileUserId || profileUserId === me.id) {
+      setProfileUser(me);
+    } else {
+      const users = await base44.entities.User.filter({ id: targetId });
+      if (users.length > 0) setProfileUser(users[0]);
+    }
 
     setLoading(false);
   };
