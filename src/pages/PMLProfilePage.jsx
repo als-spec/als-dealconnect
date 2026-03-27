@@ -92,7 +92,7 @@ export default function PMLProfilePage() {
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
-        <div className="h-24 gradient-primary opacity-20" />
+        <div className="h-24 gradient-primary opacity-20 pointer-events-none" />
         <div className="px-6 pb-6 -mt-12">
           <div className="flex flex-col md:flex-row md:items-end gap-5">
             {/* Avatar */}
