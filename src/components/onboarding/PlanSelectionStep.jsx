@@ -48,19 +48,29 @@ const PLANS = {
 
 export default function PlanSelectionStep({ memberType, onBack, paymentError }) {
   const [loading, setLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const plan = PLANS[memberType] || PLANS.investor;
 
   const handleCheckout = async () => {
     setLoading(true);
-    const origin = window.location.origin;
-    const response = await base44.functions.invoke("createCheckoutSession", {
-      priceId: plan.priceId,
-      successUrl: `${origin}/onboarding?payment=success`,
-      cancelUrl: `${origin}/onboarding?payment=cancel`,
-      memberType,
-      planName: plan.name,
-    });
-    window.location.href = response.data.url;
+    setCheckoutError("");
+    try {
+      const origin = window.location.origin;
+      const response = await base44.functions.invoke("createCheckoutSession", {
+        priceId: plan.priceId,
+        successUrl: `${origin}/onboarding?payment=success`,
+        cancelUrl: `${origin}/onboarding?payment=cancel`,
+        memberType,
+        planName: plan.name,
+      });
+      if (!response.data?.url) {
+        throw new Error(response.data?.error || "No checkout URL returned");
+      }
+      window.location.href = response.data.url;
+    } catch (e) {
+      setCheckoutError(e.message || "Failed to start checkout. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -70,9 +80,9 @@ export default function PlanSelectionStep({ memberType, onBack, paymentError }) 
         <p className="text-slate-text mt-1">Secure checkout powered by Stripe</p>
       </div>
 
-      {paymentError && (
+      {(paymentError || checkoutError) && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-5 py-3 text-sm font-medium">
-          {paymentError}
+          {checkoutError || paymentError}
         </div>
       )}
 
