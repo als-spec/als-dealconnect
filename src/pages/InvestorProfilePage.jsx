@@ -46,11 +46,6 @@ export default function InvestorProfilePage() {
 
     if (!profileUserId || profileUserId === me.id) {
       setProfileUser(me);
-    } else {
-      try {
-        const users = await base44.entities.User.filter({ id: targetId });
-        if (users.length > 0) setProfileUser(users[0]);
-      } catch {}
     }
 
     setLoading(false);
