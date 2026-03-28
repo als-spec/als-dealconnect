@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import InvestorProfileEditForm from "../components/profile/InvestorProfileEditForm";
 import TagPill from "../components/TagPill";
 import GradientButton from "../components/GradientButton";
@@ -21,6 +21,7 @@ function StatCard({ icon: Icon, label, value }) {
 
 export default function InvestorProfilePage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const profileUserId = searchParams.get("id");
 
   const [currentUser, setCurrentUser] = useState(null);
@@ -170,8 +171,8 @@ export default function InvestorProfilePage() {
           <div className="space-y-4">
             <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
               <h3 className="font-bold text-navy text-sm">Quick Actions</h3>
-              <GradientButton className="w-full justify-center">Post a New Deal</GradientButton>
-              <Button variant="outline" className="w-full gap-2">
+              <GradientButton className="w-full justify-center" onClick={() => navigate("/deal-board")}>Post a New Deal</GradientButton>
+              <Button variant="outline" className="w-full gap-2" onClick={() => navigate("/tc-directory")}>
                 <Users className="w-4 h-4" /> Browse TC Directory
               </Button>
             </div>
