@@ -39,8 +39,29 @@ export default function Applications() {
   }, []);
 
   const loadApplications = async () => {
-    const apps = await base44.entities.MemberApplication.list("-created_date");
-    setApplications(apps);
+    const [apps, users] = await Promise.all([
+      base44.entities.MemberApplication.list("-created_date"),
+      base44.entities.User.list(),
+    ]);
+
+    // Add synthetic entries for users pending approval who have no MemberApplication
+    const appUserIds = new Set(apps.map(a => a.user_id).filter(Boolean));
+    const pendingUsers = users.filter(
+      u => (u.onboarding_step === "pending_approval" || u.member_status === "pending") && !appUserIds.has(u.id)
+    );
+    const syntheticApps = pendingUsers.map(u => ({
+      id: "user_" + u.id,
+      user_id: u.id,
+      email: u.email,
+      full_name: u.full_name,
+      member_type: u.member_type || u.role,
+      company_name: u.company_name,
+      state: u.state,
+      status: "pending",
+      _synthetic: true,
+    }));
+
+    setApplications([...apps, ...syntheticApps]);
     setLoading(false);
   };
 
@@ -48,11 +69,13 @@ export default function Applications() {
     setProcessing(true);
     const app = applications.find((a) => a.id === appId);
 
-    await base44.entities.MemberApplication.update(appId, {
-      status: action,
-      admin_notes: adminNotes,
-      reviewed_date: new Date().toISOString(),
-    });
+    if (!app._synthetic) {
+      await base44.entities.MemberApplication.update(appId, {
+        status: action,
+        admin_notes: adminNotes,
+        reviewed_date: new Date().toISOString(),
+      });
+    }
 
     if (app.user_id) {
       const userUpdate = { member_status: action };
