@@ -54,10 +54,22 @@ const AuthenticatedApp = () => {
     );
   }
 
+  const publicPaths = ["/", "/partners"];
+  const currentPath = window.location.pathname;
+
   if (authError) {
     if (authError.type === "user_not_registered") {
       return <UserNotRegisteredError />;
     } else if (authError.type === "auth_required") {
+      if (publicPaths.includes(currentPath)) {
+        return (
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/partners" element={<PartnersPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        );
+      }
       navigateToLogin();
       return null;
     }
