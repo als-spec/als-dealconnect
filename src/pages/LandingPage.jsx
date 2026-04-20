@@ -49,7 +49,7 @@ export default function LandingPage() {
               Partners
             </Link>
             <button
-              onClick={() => base44.auth.redirectToLogin()}
+              onClick={() => base44.auth.redirectToLogin(window.location.origin + '/dashboard')}
               className="text-sm font-semibold text-navy border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors"
             >
               Sign In
