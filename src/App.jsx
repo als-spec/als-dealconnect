@@ -95,7 +95,7 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/partners" element={<PartnersPage />} />
       <Route element={<Layout user={user} />}>
         <Route path="/dashboard" element={<Dashboard />} />
