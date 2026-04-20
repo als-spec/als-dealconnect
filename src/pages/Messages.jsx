@@ -84,33 +84,49 @@ export default function Messages() {
   const sendMessage = async () => {
     if (!newMessage.trim() && attachments.length === 0) return;
     setSending(true);
-    await base44.entities.Message.create({
-      thread_id: selectedThread.id,
-      sender_id: user.id,
-      sender_name: user.full_name,
-      content: newMessage.trim(),
-      file_urls: attachments.map(a => a.url),
-      file_names: attachments.map(a => a.name),
-    });
-    const otherParticipants = selectedThread.participants.filter(id => id !== user.id);
-    await base44.entities.MessageThread.update(selectedThread.id, {
-      last_message: newMessage.trim() || `[${attachments.length} file(s)]`,
-      last_message_at: new Date().toISOString(),
-      unread_by: otherParticipants,
-    });
-    setNewMessage("");
-    setAttachments([]);
-    setSending(false);
+    try {
+      await base44.entities.Message.create({
+        thread_id: selectedThread.id,
+        sender_id: user.id,
+        sender_name: user.full_name,
+        content: newMessage.trim(),
+        file_urls: attachments.map(a => a.url),
+        file_names: attachments.map(a => a.name),
+      });
+      const otherParticipants = selectedThread.participants.filter(id => id !== user.id);
+      await base44.entities.MessageThread.update(selectedThread.id, {
+        last_message: newMessage.trim() || `[${attachments.length} file(s)]`,
+        last_message_at: new Date().toISOString(),
+        unread_by: otherParticipants,
+      });
+      setNewMessage("");
+      setAttachments([]);
+    } catch (e) {
+      alert("Failed to send message. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const MAX_SIZE = 25 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert("File is too large. Maximum size is 25 MB.");
+      e.target.value = '';
+      return;
+    }
     setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    setAttachments(prev => [...prev, { name: file.name, url: file_url }]);
-    setUploading(false);
-    e.target.value = '';
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setAttachments(prev => [...prev, { name: file.name, url: file_url }]);
+    } catch (e) {
+      alert("File upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
   };
 
   const createThread = async () => {

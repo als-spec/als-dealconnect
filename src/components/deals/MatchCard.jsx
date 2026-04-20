@@ -1,19 +1,45 @@
+import { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Star, CheckCircle, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function MatchCard({ application, tcProfile, onUpdate }) {
   const score = application.match_score || 0;
+  const [accepting, setAccepting] = useState(false);
+  const [declining, setDeclining] = useState(false);
 
   const handleAccept = async () => {
-    await base44.entities.DealApplication.update(application.id, { status: "accepted" });
-    await base44.entities.Deal.update(application.deal_id, { status: "filled" });
-    onUpdate?.();
+    setAccepting(true);
+    try {
+      // Check the deal hasn't already been filled by a concurrent accept
+      const deals = await base44.entities.Deal.filter({ id: application.deal_id });
+      if (deals[0]?.status === "filled") {
+        toast.error("This deal has already been filled.");
+        onUpdate?.();
+        return;
+      }
+      await base44.entities.DealApplication.update(application.id, { status: "accepted" });
+      await base44.entities.Deal.update(application.deal_id, { status: "filled" });
+      onUpdate?.();
+    } catch (e) {
+      toast.error("Failed to accept application. Please try again.");
+      onUpdate?.();
+    } finally {
+      setAccepting(false);
+    }
   };
 
   const handleDecline = async () => {
-    await base44.entities.DealApplication.update(application.id, { status: "declined" });
-    onUpdate?.();
+    setDeclining(true);
+    try {
+      await base44.entities.DealApplication.update(application.id, { status: "declined" });
+      onUpdate?.();
+    } catch (e) {
+      toast.error("Failed to decline application. Please try again.");
+    } finally {
+      setDeclining(false);
+    }
   };
 
   const gradientWidth = `${score}%`;
@@ -68,11 +94,11 @@ export default function MatchCard({ application, tcProfile, onUpdate }) {
       {/* Actions */}
       {application.status === "pending" && (
         <div className="flex gap-2 pt-1">
-          <Button variant="outline" size="sm" onClick={handleDecline} className="flex-1 gap-1 text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60 text-xs">
-            <XCircle className="w-3.5 h-3.5" /> Decline
+          <Button variant="outline" size="sm" onClick={handleDecline} disabled={declining || accepting} className="flex-1 gap-1 text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60 text-xs">
+            <XCircle className="w-3.5 h-3.5" /> {declining ? "Declining…" : "Decline"}
           </Button>
-          <Button size="sm" onClick={handleAccept} className="flex-1 gap-1 gradient-primary text-white hover:opacity-90 text-xs">
-            <CheckCircle className="w-3.5 h-3.5" /> Accept
+          <Button size="sm" onClick={handleAccept} disabled={accepting || declining} className="flex-1 gap-1 gradient-primary text-white hover:opacity-90 text-xs">
+            <CheckCircle className="w-3.5 h-3.5" /> {accepting ? "Accepting…" : "Accept"}
           </Button>
         </div>
       )}

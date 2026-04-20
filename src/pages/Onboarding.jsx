@@ -58,7 +58,7 @@ export default function Onboarding() {
     });
 
     if (paymentStatus === "success") {
-      // Verify session server-side before advancing
+      // Verify session server-side before advancing — never advance on failure
       const sessionId = urlParams.get("session_id");
       if (sessionId) {
         try {
@@ -68,11 +68,15 @@ export default function Onboarding() {
             setLoading(false);
             return;
           }
+          // Verification returned but payment not confirmed
+          setPaymentError("Payment could not be verified. Please try again or contact support.");
         } catch (e) {
-          // fall through to normal step load
+          setPaymentError("Payment verification failed. Please try again or contact support.");
         }
+      } else {
+        setPaymentError("Payment session not found. Please try again.");
       }
-      setStep("nda");
+      setStep("plan_selection");
       setLoading(false);
       return;
     }
@@ -154,8 +158,8 @@ export default function Onboarding() {
   };
 
   const handleNonCompeteDecline = async () => {
-    await base44.auth.updateMe({ onboarding_step: "member_type" });
-    setStep("member_type");
+    await base44.auth.updateMe({ onboarding_step: "nda" });
+    setStep("nda");
   };
 
   if (loading) {

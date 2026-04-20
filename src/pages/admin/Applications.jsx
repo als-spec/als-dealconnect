@@ -69,24 +69,31 @@ export default function Applications() {
     setProcessing(true);
     const app = applications.find((a) => a.id === appId);
 
-    if (!app._synthetic) {
-      await base44.entities.MemberApplication.update(appId, {
-        status: action,
-        admin_notes: adminNotes,
-        reviewed_date: new Date().toISOString(),
-      });
-    }
-
-    if (app.user_id) {
-      const userUpdate = { member_status: action };
-      if (action === "approved") {
-        userUpdate.role = app.member_type;
-        userUpdate.onboarding_step = "approved";
+    // Database updates must succeed before we notify the user
+    try {
+      if (!app._synthetic) {
+        await base44.entities.MemberApplication.update(appId, {
+          status: action,
+          admin_notes: adminNotes,
+          reviewed_date: new Date().toISOString(),
+        });
       }
-      await base44.entities.User.update(app.user_id, userUpdate);
+
+      if (app.user_id) {
+        const userUpdate = { member_status: action };
+        if (action === "approved") {
+          userUpdate.role = app.member_type;
+          userUpdate.onboarding_step = "approved";
+        }
+        await base44.entities.User.update(app.user_id, userUpdate);
+      }
+    } catch (e) {
+      toast.error("Failed to process application. Please try again.");
+      setProcessing(false);
+      return;
     }
 
-    // Send email notification
+    // Email notification — failure here should not roll back the approval
     try {
       if (action === "approved") {
         await base44.integrations.Core.SendEmail({
@@ -102,7 +109,13 @@ export default function Applications() {
         });
       }
     } catch (e) {
-      // Email failure should not block the action
+      // Email failure does not undo the approval; surface a warning
+      toast.warning(`Application ${action === "approved" ? "approved" : "rejected"} but notification email could not be sent.`);
+      setSelectedApp(null);
+      setAdminNotes("");
+      setProcessing(false);
+      loadApplications();
+      return;
     }
 
     toast.success(`Application ${action === "approved" ? "approved" : "rejected"} successfully`);
