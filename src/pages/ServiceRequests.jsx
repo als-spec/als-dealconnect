@@ -116,13 +116,18 @@ export default function ServiceRequests() {
       completed: { completed_at: now },
     };
     setSaving(true);
-    const updated = await base44.entities.ServiceRequest.update(selected.id, {
-      status: nextStatus,
-      ...timestamps[nextStatus],
-    });
-    setSelected(updated);
-    await loadRequests();
-    setSaving(false);
+    try {
+      const updated = await base44.entities.ServiceRequest.update(selected.id, {
+        status: nextStatus,
+        ...timestamps[nextStatus],
+      });
+      setSelected(updated);
+      await loadRequests();
+    } catch (e) {
+      alert("Failed to update status. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const addComment = async () => {
@@ -141,24 +146,46 @@ export default function ServiceRequests() {
     await loadRequests();
   };
 
+  const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+  const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/gif", "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"];
+
   const uploadDocument = async (e) => {
     const file = e.target.files[0];
     if (!file || !selected) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      alert("File is too large. Maximum size is 25 MB.");
+      e.target.value = '';
+      return;
+    }
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      alert("File type not allowed. Please upload a PDF, image, Word, or Excel file.");
+      e.target.value = '';
+      return;
+    }
+
     setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    const doc = {
-      name: file.name,
-      url: file_url,
-      uploaded_by: user.full_name,
-      uploaded_at: new Date().toISOString(),
-    };
-    const updated = await base44.entities.ServiceRequest.update(selected.id, {
-      documents: [...(selected.documents || []), doc],
-    });
-    setSelected(updated);
-    setUploading(false);
-    e.target.value = '';
-    await loadRequests();
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const doc = {
+        name: file.name,
+        url: file_url,
+        uploaded_by: user.full_name,
+        uploaded_at: new Date().toISOString(),
+      };
+      const updated = await base44.entities.ServiceRequest.update(selected.id, {
+        documents: [...(selected.documents || []), doc],
+      });
+      setSelected(updated);
+      await loadRequests();
+    } catch (e) {
+      alert("Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
   };
 
   const createRequest = async () => {

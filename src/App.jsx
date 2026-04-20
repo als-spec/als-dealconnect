@@ -39,9 +39,11 @@ const AuthenticatedApp = () => {
       if (authError) {
         setLoadingUser(false);
       } else {
+        let cancelled = false;
         base44.auth.me()
-          .then((u) => { setUser(u); setLoadingUser(false); })
-          .catch(() => { setLoadingUser(false); });
+          .then((u) => { if (!cancelled) { setUser(u); setLoadingUser(false); } })
+          .catch(() => { if (!cancelled) setLoadingUser(false); });
+        return () => { cancelled = true; };
       }
     }
   }, [isLoadingAuth, isLoadingPublicSettings, authError]);

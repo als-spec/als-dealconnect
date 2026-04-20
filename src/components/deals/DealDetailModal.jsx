@@ -19,10 +19,31 @@ export default function DealDetailModal({ deal, open, onClose, userRole, userId,
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [matchScore, setMatchScore] = useState(null);
+  const [error, setError] = useState("");
 
   const handleApply = async () => {
     if (!message.trim()) return;
     setSubmitting(true);
+    setError("");
+
+    // Guard: prevent duplicate applications
+    try {
+      const existing = await base44.entities.DealApplication.filter({ deal_id: deal.id, tc_id: userId });
+      if (existing.length > 0) {
+        setError("You've already applied to this deal.");
+        setSubmitting(false);
+        return;
+      }
+    } catch (e) {
+      // If the check fails, proceed — creation will fail at the DB level if constrained
+    }
+
+    // Guard: prevent applying to a deal that was filled while modal was open
+    if (deal.status === "filled" || deal.status === "closed") {
+      setError("This deal is no longer accepting applications.");
+      setSubmitting(false);
+      return;
+    }
 
     // Get AI match score
     let score = 75;
@@ -37,27 +58,31 @@ export default function DealDetailModal({ deal, open, onClose, userRole, userId,
       score = res.data?.score ?? 75;
       rationale = res.data?.rationale ?? null;
     } catch (e) {
-      // fallback to default
+      // fallback to default score
     }
     setMatchScore({ score, rationale });
 
-    await base44.entities.DealApplication.create({
-      deal_id: deal.id,
-      tc_id: userId,
-      tc_name: userName,
-      tc_profile_id: tcProfileId || "",
-      message,
-      match_score: score,
-      ai_rationale: rationale,
-      status: "pending",
-    });
-    // Move deal to in_review if still open
-    if (deal.status === "open") {
-      await base44.entities.Deal.update(deal.id, { status: "in_review" });
+    try {
+      await base44.entities.DealApplication.create({
+        deal_id: deal.id,
+        tc_id: userId,
+        tc_name: userName,
+        tc_profile_id: tcProfileId || "",
+        message,
+        match_score: score,
+        ai_rationale: rationale,
+        status: "pending",
+      });
+      if (deal.status === "open") {
+        await base44.entities.Deal.update(deal.id, { status: "in_review" });
+      }
+      setSubmitted(true);
+      onApplied?.();
+    } catch (e) {
+      setError("Failed to submit your application. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitted(true);
-    setSubmitting(false);
-    onApplied?.();
   };
 
   if (!deal) return null;
@@ -140,10 +165,13 @@ export default function DealDetailModal({ deal, open, onClose, userRole, userId,
                       onChange={e => setMessage(e.target.value)}
                     />
                   </div>
+                  {error && (
+                    <p className="text-sm text-destructive font-medium">{error}</p>
+                  )}
                   <div className="flex gap-3 justify-end">
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
                     <GradientButton onClick={handleApply} disabled={submitting || !message.trim()}>
-                      {submitting ? "Calculating AI Match…" : "Submit Interest"}
+                      {submitting ? "Submitting…" : "Submit Interest"}
                     </GradientButton>
                   </div>
                 </div>
