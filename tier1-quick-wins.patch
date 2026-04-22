@@ -1,0 +1,343 @@
+From 58bd3d484ea2e0ab1bcb18d12828fb0cb8e0dc38 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Wed, 22 Apr 2026 18:58:00 +0000
+Subject: [PATCH 1/2] Tier 1 quick wins: scoped message fetch, toast errors,
+ cleanup
+
+- Messages.jsx: Replace global Message.list(500) + client-side filter with
+  Message.filter({ thread_id }). Fixes largest perf issue and metadata leak.
+- Messages.jsx + ServiceRequests.jsx: Replace browser alert() with sonner
+  toast.error() for all user-facing error surfaces (7 sites).
+- Delete src/components/ProtectedRoute.jsx: unused and referenced
+  undefined context properties (authChecked, checkUserAuth).
+- eslint.config.js: Enable react-hooks/exhaustive-deps as warning to
+  surface stale-closure bugs in subscription effects.
+---
+ eslint.config.js                  |  1 +
+ src/components/ProtectedRoute.jsx | 37 -------------------------------
+ src/pages/Messages.jsx            | 18 ++++++++++-----
+ src/pages/ServiceRequests.jsx     |  9 ++++----
+ 4 files changed, 19 insertions(+), 46 deletions(-)
+ delete mode 100644 src/components/ProtectedRoute.jsx
+
+diff --git a/eslint.config.js b/eslint.config.js
+index 14a70c5..d06ec43 100644
+--- a/eslint.config.js
++++ b/eslint.config.js
+@@ -55,6 +55,7 @@ export default [
+         { ignore: ["cmdk-input-wrapper", "toast-close"] },
+       ],
+       "react-hooks/rules-of-hooks": "error",
++      "react-hooks/exhaustive-deps": "warn",
+     },
+   },
+ ];
+diff --git a/src/components/ProtectedRoute.jsx b/src/components/ProtectedRoute.jsx
+deleted file mode 100644
+index 6018bc6..0000000
+--- a/src/components/ProtectedRoute.jsx
++++ /dev/null
+@@ -1,37 +0,0 @@
+-import { useEffect } from 'react';
+-import { Outlet } from 'react-router-dom';
+-import { useAuth } from '@/lib/AuthContext';
+-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+-
+-const DefaultFallback = () => (
+-  <div className="fixed inset-0 flex items-center justify-center">
+-    <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+-  </div>
+-);
+-
+-export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthenticatedElement }) {
+-  const { isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth } = useAuth();
+-
+-  useEffect(() => {
+-    if (!authChecked && !isLoadingAuth) {
+-      checkUserAuth();
+-    }
+-  }, [authChecked, isLoadingAuth, checkUserAuth]);
+-
+-  if (isLoadingAuth || !authChecked) {
+-    return fallback;
+-  }
+-
+-  if (authError) {
+-    if (authError.type === 'user_not_registered') {
+-      return <UserNotRegisteredError />;
+-    }
+-    return unauthenticatedElement;
+-  }
+-
+-  if (!isAuthenticated) {
+-    return unauthenticatedElement;
+-  }
+-
+-  return <Outlet />;
+-}
+diff --git a/src/pages/Messages.jsx b/src/pages/Messages.jsx
+index fad8243..ccbfbdf 100644
+--- a/src/pages/Messages.jsx
++++ b/src/pages/Messages.jsx
+@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
+ import { Textarea } from "@/components/ui/textarea";
+ import { cn } from "@/lib/utils";
+ import { format } from "date-fns";
++import { toast } from "sonner";
+ 
+ export default function Messages() {
+   const [user, setUser] = useState(null);
+@@ -58,8 +59,15 @@ export default function Messages() {
+   const selectThread = async (thread) => {
+     setSelectedThread(thread);
+     setShowMobileConvo(true);
+-    const all = await base44.entities.Message.list('created_date', 500);
+-    setMessages(all.filter(m => m.thread_id === thread.id));
++    // Scoped fetch: only messages for this thread. Previously this pulled
++    // 500 messages globally and filtered client-side, which leaked metadata
++    // from other threads and scaled poorly.
++    const threadMessages = await base44.entities.Message.filter(
++      { thread_id: thread.id },
++      'created_date',
++      500
++    );
++    setMessages(threadMessages);
+     if (thread.unread_by?.includes(user?.id)) {
+       base44.entities.MessageThread.update(thread.id, {
+         unread_by: thread.unread_by.filter(id => id !== user.id)
+@@ -102,7 +110,7 @@ export default function Messages() {
+       setNewMessage("");
+       setAttachments([]);
+     } catch (e) {
+-      alert("Failed to send message. Please try again.");
++      toast.error("Failed to send message. Please try again.");
+     } finally {
+       setSending(false);
+     }
+@@ -113,7 +121,7 @@ export default function Messages() {
+     if (!file) return;
+     const MAX_SIZE = 25 * 1024 * 1024;
+     if (file.size > MAX_SIZE) {
+-      alert("File is too large. Maximum size is 25 MB.");
++      toast.error("File is too large. Maximum size is 25 MB.");
+       e.target.value = '';
+       return;
+     }
+@@ -122,7 +130,7 @@ export default function Messages() {
+       const { file_url } = await base44.integrations.Core.UploadFile({ file });
+       setAttachments(prev => [...prev, { name: file.name, url: file_url }]);
+     } catch (e) {
+-      alert("File upload failed. Please try again.");
++      toast.error("File upload failed. Please try again.");
+     } finally {
+       setUploading(false);
+       e.target.value = '';
+diff --git a/src/pages/ServiceRequests.jsx b/src/pages/ServiceRequests.jsx
+index c6fc51b..e0c5917 100644
+--- a/src/pages/ServiceRequests.jsx
++++ b/src/pages/ServiceRequests.jsx
+@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
+ import { Textarea } from "@/components/ui/textarea";
+ import { cn } from "@/lib/utils";
+ import { format } from "date-fns";
++import { toast } from "sonner";
+ 
+ const STAGES = [
+   { key: "requested", label: "Requested", icon: Clock },
+@@ -124,7 +125,7 @@ export default function ServiceRequests() {
+       setSelected(updated);
+       await loadRequests();
+     } catch (e) {
+-      alert("Failed to update status. Please try again.");
++      toast.error("Failed to update status. Please try again.");
+     } finally {
+       setSaving(false);
+     }
+@@ -156,12 +157,12 @@ export default function ServiceRequests() {
+     if (!file || !selected) return;
+ 
+     if (file.size > MAX_FILE_SIZE) {
+-      alert("File is too large. Maximum size is 25 MB.");
++      toast.error("File is too large. Maximum size is 25 MB.");
+       e.target.value = '';
+       return;
+     }
+     if (!ALLOWED_TYPES.includes(file.type)) {
+-      alert("File type not allowed. Please upload a PDF, image, Word, or Excel file.");
++      toast.error("File type not allowed. Please upload a PDF, image, Word, or Excel file.");
+       e.target.value = '';
+       return;
+     }
+@@ -181,7 +182,7 @@ export default function ServiceRequests() {
+       setSelected(updated);
+       await loadRequests();
+     } catch (e) {
+-      alert("Upload failed. Please try again.");
++      toast.error("Upload failed. Please try again.");
+     } finally {
+       setUploading(false);
+       e.target.value = '';
+-- 
+2.43.0
+
+
+From 2a7a292f33ed182f346a8fe73db9310266003da1 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Wed, 22 Apr 2026 19:06:42 +0000
+Subject: [PATCH 2/2] Landing page: route all three subscription types
+ correctly
+
+Spec compliance: TC, Investor, and PML should each reach their correct
+subscription plan from the landing page. Previously the PML path was
+only accessible via the member-cards section below the fold, and the
+hero 'I'm an Investor or Lender' button misrouted PMLs to the Investor
+plan.
+
+- LandingPage.jsx: Replace the 'I'm an Investor or Lender' hero link
+  with a DropdownMenu that offers Investor and PML as distinct choices,
+  each routing to the correct /onboarding?type=... URL.
+- LandingPage.jsx: Add explicit ctaLabel to each MEMBER_CARDS entry
+  instead of naively split role names ('Join as Transaction',
+  'Join as Private'). New labels: 'Join as TC', 'Join as Investor',
+  'Join as Lender'.
+- PlanSelectionStep.jsx: Remove the silent '|| PLANS.investor' fallback
+  that could bill PMLs for the Investor plan on missing member_type.
+  Replace with an explicit error state that sends the user back to the
+  member-type step.
+---
+ .../onboarding/PlanSelectionStep.jsx          | 19 ++++++-
+ src/pages/LandingPage.jsx                     | 55 ++++++++++++++++---
+ 2 files changed, 65 insertions(+), 9 deletions(-)
+
+diff --git a/src/components/onboarding/PlanSelectionStep.jsx b/src/components/onboarding/PlanSelectionStep.jsx
+index b030795..f9b7b4c 100644
+--- a/src/components/onboarding/PlanSelectionStep.jsx
++++ b/src/components/onboarding/PlanSelectionStep.jsx
+@@ -49,7 +49,24 @@ const PLANS = {
+ export default function PlanSelectionStep({ memberType, onBack, paymentError }) {
+   const [loading, setLoading] = useState(false);
+   const [checkoutError, setCheckoutError] = useState("");
+-  const plan = PLANS[memberType] || PLANS.investor;
++  const plan = PLANS[memberType];
++
++  // Guard: if member_type isn't set (URL tamper, stale state, or a bug in the
++  // previous step's save), do NOT silently default to Investor — that risks
++  // billing and routing users to the wrong role. Send them back to pick a type.
++  if (!plan) {
++    return (
++      <div className="space-y-6 text-center">
++        <h2 className="text-2xl font-bold text-navy">We couldn't load your plan</h2>
++        <p className="text-slate-text max-w-md mx-auto">
++          It looks like your member type wasn't saved. Please go back and select your role so we can show you the right plan.
++        </p>
++        <Button onClick={onBack} className="gradient-primary text-white">
++          Back to Member Type
++        </Button>
++      </div>
++    );
++  }
+ 
+   const handleCheckout = async () => {
+     setLoading(true);
+diff --git a/src/pages/LandingPage.jsx b/src/pages/LandingPage.jsx
+index cc072d6..d16c01f 100644
+--- a/src/pages/LandingPage.jsx
++++ b/src/pages/LandingPage.jsx
+@@ -1,12 +1,19 @@
+ import { Link, useNavigate } from "react-router-dom";
+ import { base44 } from "@/api/base44Client";
+ import Logo from "../components/Logo";
+-import { ShieldCheck, TrendingUp, Award, DollarSign, ArrowRight } from "lucide-react";
++import { ShieldCheck, TrendingUp, Award, DollarSign, ArrowRight, ChevronDown } from "lucide-react";
++import {
++  DropdownMenu,
++  DropdownMenuTrigger,
++  DropdownMenuContent,
++  DropdownMenuItem,
++} from "@/components/ui/dropdown-menu";
+ 
+ const MEMBER_CARDS = [
+   {
+     role: "Transaction Coordinator",
+     type: "tc",
++    ctaLabel: "Join as TC",
+     icon: "📋",
+     color: "from-teal to-cyan",
+     tags: ["Creative Finance", "Fix & Flip", "DSCR", "Subject-To"],
+@@ -15,6 +22,7 @@ const MEMBER_CARDS = [
+   {
+     role: "Investor / Agent",
+     type: "investor",
++    ctaLabel: "Join as Investor",
+     icon: "🏗️",
+     color: "from-cyan to-blue-400",
+     tags: ["Deal Flow", "TC Matching", "Private Lending", "Closings"],
+@@ -23,6 +31,7 @@ const MEMBER_CARDS = [
+   {
+     role: "Private Money Lender",
+     type: "pml",
++    ctaLabel: "Join as Lender",
+     icon: "💼",
+     color: "from-teal to-green-400",
+     tags: ["Bridge Loans", "Fix & Flip", "DSCR", "Ground-Up"],
+@@ -113,12 +122,42 @@ export default function LandingPage({ user }) {
+                 >
+                   I'm a TC <ArrowRight className="w-4 h-4" />
+                 </Link>
+-                <Link
+-                  to="/onboarding?type=investor"
+-                  className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
+-                >
+-                  I'm an Investor or Lender <ArrowRight className="w-4 h-4" />
+-                </Link>
++                <DropdownMenu>
++                  <DropdownMenuTrigger asChild>
++                    <button
++                      type="button"
++                      className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
++                    >
++                      I'm an Investor or Lender <ChevronDown className="w-4 h-4" />
++                    </button>
++                  </DropdownMenuTrigger>
++                  <DropdownMenuContent align="center" className="w-64">
++                    <DropdownMenuItem
++                      onSelect={() => navigate("/onboarding?type=investor")}
++                      className="py-3 cursor-pointer"
++                    >
++                      <div className="flex items-start gap-3">
++                        <span className="text-xl">🏗️</span>
++                        <div>
++                          <p className="font-bold text-navy text-sm">Investor / Agent</p>
++                          <p className="text-xs text-muted-foreground">Post deals, find TCs</p>
++                        </div>
++                      </div>
++                    </DropdownMenuItem>
++                    <DropdownMenuItem
++                      onSelect={() => navigate("/onboarding?type=pml")}
++                      className="py-3 cursor-pointer"
++                    >
++                      <div className="flex items-start gap-3">
++                        <span className="text-xl">💼</span>
++                        <div>
++                          <p className="font-bold text-navy text-sm">Private Money Lender</p>
++                          <p className="text-xs text-muted-foreground">Fund deals, grow portfolio</p>
++                        </div>
++                      </div>
++                    </DropdownMenuItem>
++                  </DropdownMenuContent>
++                </DropdownMenu>
+               </>
+             )}
+           </div>
+@@ -167,7 +206,7 @@ export default function LandingPage({ user }) {
+                       to={`/onboarding?type=${card.type}`}
+                       className="gradient-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition-all inline-flex items-center gap-2 w-full justify-center"
+                     >
+-                      Join as {card.role.split(" ")[0]} <ArrowRight className="w-3.5 h-3.5" />
++                      {card.ctaLabel} <ArrowRight className="w-3.5 h-3.5" />
+                     </Link>
+                   )}
+                 </div>
+-- 
+2.43.0
+
