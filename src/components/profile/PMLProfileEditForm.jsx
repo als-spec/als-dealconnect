@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import GradientButton from "../GradientButton";
 import { Button } from "@/components/ui/button";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 
 const LOAN_TYPES = ["Bridge","Fix & Flip","DSCR","Ground-Up Construction","Short-Term Rental","Multi-Family","Mixed-Use","Cash-Out Refi","New Construction","Land","Creative Finance","Sub-To","Wraps","Seller Finance","Cash"];
 const PROPERTY_TYPES = ["SFR","Multi-Family 2–4","Multi-Family 5+","Commercial","Mixed-Use","Land (case by case)"];

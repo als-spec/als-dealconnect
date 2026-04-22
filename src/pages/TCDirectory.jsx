@@ -3,8 +3,7 @@ import { base44 } from "@/api/base44Client";
 import TCCard from "../components/directory/TCCard";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, SlidersHorizontal, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Search, Users } from "lucide-react";
 
 const SPECIALTIES = [
   "All Specialties","Creative Finance","Subject-To","Seller Finance","DSCR",

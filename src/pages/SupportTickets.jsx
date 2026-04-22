@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, LifeBuoy, Clock, CheckCircle2, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, LifeBuoy, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import moment from "moment";
 

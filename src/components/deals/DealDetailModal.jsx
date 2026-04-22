@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import GradientButton from "@/components/GradientButton";
 import { base44 } from "@/api/base44Client";
-import { MapPin, Calendar, DollarSign, Star, Building, Tag, Layers } from "lucide-react";
+import { MapPin, Calendar, DollarSign, Star } from "lucide-react";
 import { format } from "date-fns";
 
 const STAGE_COLORS = {
