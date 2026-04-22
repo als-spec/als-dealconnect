@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
 import { ExternalLink, ArrowRight, X, CheckCircle2 } from "lucide-react";
@@ -26,6 +26,7 @@ const EMPTY_FORM = {
 };
 
 export default function PartnersPage() {
+  const navigate = useNavigate();
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
@@ -34,8 +35,10 @@ export default function PartnersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [authedUser, setAuthedUser] = useState(null);
 
   useEffect(() => {
+    base44.auth.me().then(u => { if (u) setAuthedUser(u); }).catch(() => {});
     base44.entities.Partner.filter({ is_active: true }).then((data) => {
       setPartners(data);
       setLoading(false);
@@ -80,12 +83,29 @@ export default function PartnersPage() {
           <Link to="/"><Logo size="md" /></Link>
           <div className="flex items-center gap-4">
             <Link to="/partners" className="text-sm font-semibold text-teal">Partners</Link>
-            <Link
-              to="/onboarding"
-              className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
-            >
-              Join Now
-            </Link>
+            {authedUser ? (
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
+              >
+                Go to Dashboard
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => base44.auth.redirectToLogin(window.location.href)}
+                  className="text-sm font-semibold text-navy border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors"
+                >
+                  Sign In
+                </button>
+                <Link
+                  to="/onboarding"
+                  className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
+                >
+                  Join Now
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
