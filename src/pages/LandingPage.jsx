@@ -102,18 +102,29 @@ export default function LandingPage() {
             to close creative finance deals with confidence and speed.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/onboarding?type=tc"
-              className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
-            >
-              I'm a TC <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              to="/onboarding?type=investor"
-              className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
-            >
-              I'm an Investor or Lender <ArrowRight className="w-4 h-4" />
-            </Link>
+            {authedUser ? (
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
+              >
+                Go to Dashboard <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <>
+                <Link
+                  to="/onboarding?type=tc"
+                  className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
+                >
+                  I'm a TC <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  to="/onboarding?type=investor"
+                  className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
+                >
+                  I'm an Investor or Lender <ArrowRight className="w-4 h-4" />
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -155,18 +166,44 @@ export default function LandingPage() {
                       </span>
                     ))}
                   </div>
-                  <Link
-                    to={`/onboarding?type=${card.type}`}
-                    className="gradient-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition-all inline-flex items-center gap-2 w-full justify-center"
-                  >
-                    Join as {card.role.split(" ")[0]} <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
+                  {!authedUser && (
+                    <Link
+                      to={`/onboarding?type=${card.type}`}
+                      className="gradient-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition-all inline-flex items-center gap-2 w-full justify-center"
+                    >
+                      Join as {card.role.split(" ")[0]} <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+
+      {/* Bottom CTA — only for unauthenticated visitors */}
+      {!authedUser && (
+        <section className="px-6 py-16 bg-white border-t border-border">
+          <div className="max-w-2xl mx-auto text-center space-y-5">
+            <h2 className="text-2xl font-extrabold text-navy">Ready to get started?</h2>
+            <p className="text-slate-text">Already a member? Sign in to access your dashboard. New here? Join the network today.</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={() => base44.auth.redirectToLogin(window.location.href)}
+                className="bg-white border-2 border-navy text-navy font-bold px-8 py-3 rounded-xl hover:bg-navy/5 transition-all inline-flex items-center justify-center gap-2"
+              >
+                Login as a Member
+              </button>
+              <Link
+                to="/onboarding"
+                className="gradient-primary text-white font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-all shadow inline-flex items-center justify-center gap-2"
+              >
+                Join Now <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="bg-navy py-12 px-6">
