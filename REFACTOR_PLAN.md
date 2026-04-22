@@ -97,14 +97,30 @@ git diff --stat origin/main..HEAD
 # Install (only runs npm install if lockfile changed; fast no-op otherwise)
 npm install
 
-# Lint: expect 0 errors, ~8 warnings (the new exhaustive-deps warnings
-# on pre-existing subscription-closure bugs are expected and documented
-# as Tier 2 work in the audit report)
-npm run lint 2>&1 | tee /tmp/lint.out
-grep -E "[0-9]+ errors?" /tmp/lint.out | grep -v "0 errors" && {
-  echo "ERROR: lint has errors"
+# Lint: the whole-codebase `npm run lint` is NOT the right gate here.
+# origin/main has 24 pre-existing unused-import errors that are unrelated
+# to this patch (documented as out-of-scope; tracked for a separate cleanup PR).
+# Instead, lint ONLY the files this patch modifies — expected: 0 errors,
+# ~8 warnings (the new react-hooks/exhaustive-deps warnings surface
+# pre-existing subscription-closure bugs documented as Tier 2 work).
+npx eslint --no-warn-ignored \
+  src/pages/Messages.jsx \
+  src/pages/ServiceRequests.jsx \
+  src/pages/LandingPage.jsx \
+  src/components/onboarding/PlanSelectionStep.jsx \
+  eslint.config.js \
+  2>&1 | tee /tmp/lint.out
+
+# Fail only on errors in the touched files. Warnings are OK.
+if grep -qE "[1-9][0-9]* error" /tmp/lint.out; then
+  echo "ERROR: patch introduced lint errors in touched files"
   exit 1
-}
+fi
+
+# Informational: report the pre-existing error count on the full codebase
+# so the human knows there's a known cleanup backlog, but do NOT fail on it.
+FULL_ERRORS=$(npm run lint 2>&1 | grep -oE "[0-9]+ errors?" | head -1 | grep -oE "[0-9]+" || echo "0")
+echo "ℹ️  Note: full codebase has $FULL_ERRORS pre-existing lint errors (unrelated to this PR)."
 
 # Build: must succeed
 npm run build
@@ -193,7 +209,8 @@ If this plan is executed again (e.g., plan author updates the patch and says "re
 ```
 ✅ Phase 1: Branch tier1-quick-wins ready
 ✅ Phase 2: Applied 2 commits (6 files, +84/−55)
-✅ Phase 3: Lint (0 errors, 8 warnings as expected) + Build OK
+✅ Phase 3: Lint (0 errors, 8 warnings in touched files) + Build OK
+            ℹ️  Full codebase has 24 pre-existing lint errors (separate cleanup PR)
 ✅ Phase 4: Pushed to origin/tier1-quick-wins
 ✅ Phase 5: PR #<N> [created|updated] — <url>
 ⏸  Phase 6: Awaiting cleanup confirmation
