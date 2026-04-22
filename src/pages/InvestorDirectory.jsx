@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import InvestorCard from "../components/directory/InvestorCard";
 import { Search } from "lucide-react";
@@ -9,32 +10,30 @@ const DEAL_TYPES = ["Fix & Flip", "DSCR", "Wholesale", "Creative Finance", "Buy 
 const US_STATES = ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"];
 
 export default function InvestorDirectory() {
-  const [profiles, setProfiles] = useState([]);
-  const [userMap, setUserMap] = useState({});
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterDealType, setFilterDealType] = useState("all");
   const [filterState, setFilterState] = useState("all");
 
-  useEffect(() => {
-    load();
-  }, []);
+  // Published investor profiles.
+  const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
+    queryKey: ['InvestorProfile', { is_published: true }],
+    queryFn: () => base44.entities.InvestorProfile.filter({ is_published: true }),
+  });
 
-  const load = async () => {
-    setLoading(true);
-    const all = await base44.entities.InvestorProfile.filter({ is_published: true });
-    try {
-      // Only fetch users with the investor role instead of the full user table.
-      // This directory only ever renders investor profiles, so any other roles
-      // in the lookup map are wasted bytes + a PII disclosure.
-      const users = await base44.entities.User.filter({ role: "investor" });
-      const map = {};
-      users.forEach((u) => { map[u.id] = u; });
-      setUserMap(map);
-    } catch {}
-    setProfiles(all);
-    setLoading(false);
-  };
+  // Investor-role users — only fetch if there are profiles to enrich.
+  const { data: users = [] } = useQuery({
+    queryKey: ['User', { role: 'investor' }],
+    queryFn: () => base44.entities.User.filter({ role: "investor" }),
+    enabled: profiles.length > 0,
+  });
+
+  const userMap = useMemo(() => {
+    const map = {};
+    users.forEach((u) => { map[u.id] = u; });
+    return map;
+  }, [users]);
+
+  const loading = loadingProfiles;
 
   const filtered = profiles.filter((p) => {
     const user = userMap[p.user_id] || {};
