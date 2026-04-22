@@ -66,8 +66,8 @@ const AuthenticatedApp = () => {
       if (publicPaths.includes(currentPath)) {
         return (
           <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/partners" element={<PartnersPage />} />
+            <Route path="/" element={<LandingPage user={null} />} />
+            <Route path="/partners" element={<PartnersPage user={null} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         );
@@ -85,8 +85,8 @@ const AuthenticatedApp = () => {
   if (needsOnboarding) {
     return (
       <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/partners" element={<PartnersPage />} />
+        <Route path="/" element={<LandingPage user={user} />} />
+        <Route path="/partners" element={<PartnersPage user={user} />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="*" element={<Navigate to="/onboarding" replace />} />
       </Routes>
@@ -95,8 +95,8 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/partners" element={<PartnersPage />} />
+      <Route path="/" element={<LandingPage user={user} />} />
+      <Route path="/partners" element={<PartnersPage user={user} />} />
       <Route element={<Layout user={user} />}>
         <Route path="/dashboard" element={<Dashboard />} />
 

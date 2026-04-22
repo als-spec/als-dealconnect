@@ -1,5 +1,4 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
 import { ShieldCheck, TrendingUp, Award, DollarSign, ArrowRight } from "lucide-react";
@@ -38,17 +37,10 @@ const TRUST_ITEMS = [
   { icon: DollarSign, label: "Vetted Private Lenders" },
 ];
 
-export default function LandingPage() {
+export default function LandingPage({ user }) {
   const navigate = useNavigate();
-  const [authedUser, setAuthedUser] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
-
-  useEffect(() => {
-    base44.auth.me()
-      .then(u => { if (u) setAuthedUser(u); })
-      .catch(() => {})
-      .finally(() => setAuthChecked(true));
-  }, []);
+  // user prop is passed from App.jsx (already resolved); null = unauthenticated
+  const authedUser = user ?? null;
 
   return (
     <div className="min-h-screen font-barlow" style={{ backgroundColor: "#e8f0f7" }}>
@@ -60,30 +52,28 @@ export default function LandingPage() {
             <Link to="/partners" className="text-sm font-semibold text-slate-text hover:text-teal transition-colors">
               Partners
             </Link>
-            {authChecked && (
-              authedUser ? (
+            {authedUser ? (
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
+              >
+                Go to Dashboard
+              </button>
+            ) : (
+              <>
                 <button
-                  onClick={() => navigate("/dashboard")}
+                  onClick={() => base44.auth.redirectToLogin(window.location.href)}
+                  className="text-sm font-semibold text-navy border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors"
+                >
+                  Sign In
+                </button>
+                <Link
+                  to="/onboarding"
                   className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
                 >
-                  Go to Dashboard
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => base44.auth.redirectToLogin(window.location.href)}
-                    className="text-sm font-semibold text-navy border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors"
-                  >
-                    Sign In
-                  </button>
-                  <Link
-                    to="/onboarding"
-                    className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
-                  >
-                    Join Now
-                  </Link>
-                </>
-              )
+                  Join Now
+                </Link>
+              </>
             )}
           </div>
         </div>
@@ -107,33 +97,31 @@ export default function LandingPage() {
             Connecting vetted Transaction Coordinators, Investors, and Private Money Lenders
             to close creative finance deals with confidence and speed.
           </p>
-          {authChecked && (
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              {authedUser ? (
-                <button
-                  onClick={() => navigate("/dashboard")}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {authedUser ? (
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
+              >
+                Go to Dashboard <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <>
+                <Link
+                  to="/onboarding?type=tc"
                   className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
                 >
-                  Go to Dashboard <ArrowRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <>
-                  <Link
-                    to="/onboarding?type=tc"
-                    className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
-                  >
-                    I'm a TC <ArrowRight className="w-4 h-4" />
-                  </Link>
-                  <Link
-                    to="/onboarding?type=investor"
-                    className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
-                  >
-                    I'm an Investor or Lender <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </>
-              )}
-            </div>
-          )}
+                  I'm a TC <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  to="/onboarding?type=investor"
+                  className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
+                >
+                  I'm an Investor or Lender <ArrowRight className="w-4 h-4" />
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </section>
 
