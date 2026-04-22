@@ -2,9 +2,12 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
-import { ExternalLink, ArrowRight } from "lucide-react";
+import { ExternalLink, ArrowRight, X, CheckCircle2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const TIERS = ["All", "Platinum", "Gold", "Preferred"];
+const CATEGORIES = ["Title Company", "Private Lender", "Legal", "PropTech", "Insurance", "Document Services", "Other"];
 
 const TIER_STYLES = {
   platinum: { label: "Platinum", border: "border-teal", badge: "bg-teal/10 text-teal border-teal/30" },
@@ -12,10 +15,25 @@ const TIER_STYLES = {
   preferred: { label: "Preferred", border: "border-cyan", badge: "bg-cyan/10 text-cyan border-cyan/30" },
 };
 
+const EMPTY_FORM = {
+  company_name: "",
+  category: "Title Company",
+  description: "",
+  website_url: "",
+  contact_name: "",
+  contact_email: "",
+  contact_phone: "",
+};
+
 export default function PartnersPage() {
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
+  const [showApply, setShowApply] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     base44.entities.Partner.filter({ is_active: true }).then((data) => {
@@ -27,6 +45,32 @@ export default function PartnersPage() {
   const filtered = filter === "All"
     ? partners
     : partners.filter((p) => p.tier === filter.toLowerCase());
+
+  const openApply = () => { setForm(EMPTY_FORM); setSubmitted(false); setError(""); setShowApply(true); };
+  const closeApply = () => setShowApply(false);
+
+  const handleSubmit = async () => {
+    if (!form.company_name.trim() || !form.contact_name.trim() || !form.contact_email.trim()) {
+      setError("Company name, your name, and email are required.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      await base44.entities.Partner.create({
+        ...form,
+        is_active: false,
+        application_status: "pending",
+        tier: "preferred",
+        logo_color: "#1432c8",
+      });
+      setSubmitted(true);
+    } catch (e) {
+      setError("Failed to submit your application. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen font-barlow" style={{ backgroundColor: "#d6e4f0" }}>
@@ -114,12 +158,12 @@ export default function PartnersPage() {
           <p className="text-slate-text mb-6">
             Join our trusted network of service providers and connect with investors, TCs, and lenders closing creative finance deals.
           </p>
-          <a
-            href="mailto:partners@alsdealconnect.com"
+          <button
+            onClick={openApply}
             className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg inline-flex items-center gap-2"
           >
             Apply to Partner <ArrowRight className="w-4 h-4" />
-          </a>
+          </button>
         </div>
       </section>
 
@@ -134,6 +178,132 @@ export default function PartnersPage() {
           <p className="text-white/40 text-sm">© {new Date().getFullYear()} ALS DealConnect</p>
         </div>
       </footer>
+
+      {/* Partner Application Modal */}
+      {showApply && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-border shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <div>
+                <h2 className="text-xl font-extrabold text-navy">Partner Application</h2>
+                <p className="text-sm text-slate-text mt-0.5">Tell us about your company — we'll review and get back to you.</p>
+              </div>
+              <button onClick={closeApply} className="p-1 rounded hover:bg-muted transition-colors">
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            {submitted ? (
+              <div className="p-10 text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-teal/10 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-8 h-8 text-teal" />
+                </div>
+                <h3 className="text-xl font-extrabold text-navy">Application Received!</h3>
+                <p className="text-slate-text leading-relaxed">
+                  Thank you for applying to be an ALS DealConnect partner. Our team will review your application and reach out within 2–3 business days.
+                </p>
+                <Button onClick={closeApply} className="gradient-primary text-white border-0 hover:opacity-90 mt-2">
+                  Close
+                </Button>
+              </div>
+            ) : (
+              <div className="p-6 space-y-4">
+                {/* Company Info */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">Company Information</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-semibold text-navy mb-1 block">Company Name <span className="text-destructive">*</span></label>
+                      <Input
+                        value={form.company_name}
+                        onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+                        placeholder="Acme Title Co."
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm font-semibold text-navy mb-1 block">Category <span className="text-destructive">*</span></label>
+                        <select
+                          className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                          value={form.category}
+                          onChange={(e) => setForm({ ...form, category: e.target.value })}
+                        >
+                          {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-navy mb-1 block">Website</label>
+                        <Input
+                          value={form.website_url}
+                          onChange={(e) => setForm({ ...form, website_url: e.target.value })}
+                          placeholder="https://..."
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-navy mb-1 block">Description of Services</label>
+                      <textarea
+                        className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background resize-none h-20"
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        placeholder="Briefly describe what your company offers and how you support creative finance transactions…"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact Info */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">Your Contact Information</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-semibold text-navy mb-1 block">Your Name <span className="text-destructive">*</span></label>
+                      <Input
+                        value={form.contact_name}
+                        onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
+                        placeholder="Jane Smith"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm font-semibold text-navy mb-1 block">Email <span className="text-destructive">*</span></label>
+                        <Input
+                          type="email"
+                          value={form.contact_email}
+                          onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+                          placeholder="jane@company.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-navy mb-1 block">Phone</label>
+                        <Input
+                          type="tel"
+                          value={form.contact_phone}
+                          onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
+                          placeholder="(555) 000-0000"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {error && <p className="text-sm text-destructive font-medium">{error}</p>}
+
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" onClick={closeApply} className="flex-1">Cancel</Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="flex-1 gradient-primary text-white border-0 hover:opacity-90"
+                  >
+                    {submitting ? "Submitting…" : "Submit Application"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -148,7 +318,6 @@ function PartnerCard({ partner }) {
       {/* Logo panel */}
       <div className="relative h-28 flex items-center justify-center" style={{ backgroundColor: logoColor }}>
         <span className="text-3xl font-extrabold text-white/90">{initials}</span>
-        {/* Tier badge */}
         <span className={`absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full border bg-white ${tier.badge}`}>
           {tier.label}
         </span>
