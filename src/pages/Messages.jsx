@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 export default function Messages() {
   const [user, setUser] = useState(null);
@@ -58,8 +59,15 @@ export default function Messages() {
   const selectThread = async (thread) => {
     setSelectedThread(thread);
     setShowMobileConvo(true);
-    const all = await base44.entities.Message.list('created_date', 500);
-    setMessages(all.filter(m => m.thread_id === thread.id));
+    // Scoped fetch: only messages for this thread. Previously this pulled
+    // 500 messages globally and filtered client-side, which leaked metadata
+    // from other threads and scaled poorly.
+    const threadMessages = await base44.entities.Message.filter(
+      { thread_id: thread.id },
+      'created_date',
+      500
+    );
+    setMessages(threadMessages);
     if (thread.unread_by?.includes(user?.id)) {
       base44.entities.MessageThread.update(thread.id, {
         unread_by: thread.unread_by.filter(id => id !== user.id)
@@ -102,7 +110,7 @@ export default function Messages() {
       setNewMessage("");
       setAttachments([]);
     } catch (e) {
-      alert("Failed to send message. Please try again.");
+      toast.error("Failed to send message. Please try again.");
     } finally {
       setSending(false);
     }
@@ -113,7 +121,7 @@ export default function Messages() {
     if (!file) return;
     const MAX_SIZE = 25 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      alert("File is too large. Maximum size is 25 MB.");
+      toast.error("File is too large. Maximum size is 25 MB.");
       e.target.value = '';
       return;
     }
@@ -122,7 +130,7 @@ export default function Messages() {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setAttachments(prev => [...prev, { name: file.name, url: file_url }]);
     } catch (e) {
-      alert("File upload failed. Please try again.");
+      toast.error("File upload failed. Please try again.");
     } finally {
       setUploading(false);
       e.target.value = '';
