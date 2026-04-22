@@ -90,8 +90,22 @@ export default function ServiceRequests() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const users = await base44.entities.User.list();
-      setAllUsers(users.filter(usr => usr.id !== user.id));
+      // Service requests are always between an investor and a TC.
+      // Scope the counterparty picker to the OPPOSITE role so we don't
+      // pull the full user table — e.g., a TC only needs to see investors.
+      // Admins can pick anyone approved (fallback to approved-status filter).
+      let counterparties = [];
+      try {
+        if (user.role === "tc") {
+          counterparties = await base44.entities.User.filter({ role: "investor" });
+        } else if (user.role === "investor") {
+          counterparties = await base44.entities.User.filter({ role: "tc" });
+        } else {
+          // admin or other: show approved members only
+          counterparties = await base44.entities.User.filter({ member_status: "approved" });
+        }
+      } catch {}
+      setAllUsers(counterparties.filter(usr => usr.id !== user.id));
       await loadRequests(user);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

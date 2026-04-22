@@ -32,7 +32,8 @@ export default function PMLDirectory() {
     setProfiles(pmls);
     if (pmls.length > 0) {
       try {
-        const users = await base44.entities.User.list();
+        // Scoped to PML-role users (directory only renders PML profiles).
+        const users = await base44.entities.User.filter({ role: "pml" });
         const map = {};
         users.forEach((u) => { map[u.id] = u; });
         setUserMap(map);

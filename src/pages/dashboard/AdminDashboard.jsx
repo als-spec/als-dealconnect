@@ -31,6 +31,9 @@ export default function AdminDashboard({ user }) {
   const load = async () => {
     const [apps, users, deals_, threads, revs] = await Promise.all([
       base44.entities.MemberApplication.list('-created_date'),
+      // Admin dashboard needs the full user table for role breakdown charts
+      // and total member counts. At scale (>~500 members) this should move
+      // to a server-side stats aggregation — tracked as T3.4.
       base44.entities.User.list(),
       base44.entities.Deal.list(),
       base44.entities.MessageThread.list(),

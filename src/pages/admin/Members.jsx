@@ -53,6 +53,8 @@ export default function Members() {
   }, []);
 
   const load = async () => {
+    // Admin member-management needs the full user table. Pagination is tracked
+    // as T3.4 — at scale this should become a paginated server-side query.
     const users = await base44.entities.User.list("-created_date");
     setMembers(users);
     setLoading(false);
