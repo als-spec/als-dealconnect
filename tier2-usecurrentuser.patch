@@ -1,0 +1,797 @@
+From 0607c30228d691d60887c1be392fe1c97f393548 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Wed, 22 Apr 2026 20:22:27 +0000
+Subject: [PATCH] T2.1: Add useCurrentUser hook, consolidate 16
+ base44.auth.me() calls
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Introduces a shared react-query-backed hook as the single source of
+truth for the authenticated user. Replaces the pattern of every page
+doing its own useState+useEffect+base44.auth.me() with a cached,
+deduplicated query.
+
+Hook (src/hooks/useCurrentUser.js):
+- useCurrentUser(options) — primary read hook, 5 min staleTime
+- useInvalidateCurrentUser() — invalidate after mutations
+- useRefetchCurrentUser() — imperative fresh fetch
+
+Migrated call sites (12 files, 16 base44.auth.me() calls removed):
+- src/App.jsx (AuthenticatedApp) — uses { enabled } to wait for auth preflight
+- src/pages/Dashboard.jsx
+- src/pages/Messages.jsx
+- src/pages/ServiceRequests.jsx
+- src/pages/DealBoard.jsx
+- src/pages/TCProfilePage.jsx
+- src/pages/PMLProfilePage.jsx
+- src/pages/InvestorProfilePage.jsx
+- src/pages/SupportTickets.jsx
+- src/pages/admin/SupportTickets.jsx
+- src/pages/Onboarding.jsx — 4 call sites using refetch/invalidate helpers
+- src/lib/PageNotFound.jsx — was using its own ['user'] queryKey, now shares
+
+Intentionally NOT migrated:
+- src/lib/AuthContext.jsx — the auth bootstrap integrates tightly with
+  public_settings + authError lifecycle; migration would expand scope
+  meaningfully. Left as-is for a future follow-up.
+
+Net effect:
+- Route transitions no longer trigger redundant user refetches
+- Loading state is consistent across the app (isLoading from react-query)
+- PageNotFound no longer uses a fragmented queryKey
+- Onboarding's write-then-read patterns use the imperative refetch helper
+
+Verification:
+- npm run lint: 0 errors (full codebase)
+- npm run build: succeeds
+- 16 -> 3 base44.auth.me() call sites (2 in the hook itself + 1 in
+  AuthContext bootstrap that was intentionally left alone)
+---
+ src/App.jsx                        | 26 ++++------
+ src/hooks/useCurrentUser.js        | 77 ++++++++++++++++++++++++++++++
+ src/lib/PageNotFound.jsx           | 19 ++------
+ src/pages/Dashboard.jsx            | 11 ++---
+ src/pages/DealBoard.jsx            | 18 +++----
+ src/pages/InvestorProfilePage.jsx  | 22 ++++-----
+ src/pages/Messages.jsx             | 31 ++++++------
+ src/pages/Onboarding.jsx           | 18 +++++--
+ src/pages/PMLProfilePage.jsx       | 22 ++++-----
+ src/pages/ServiceRequests.jsx      | 22 ++++-----
+ src/pages/SupportTickets.jsx       | 22 ++++-----
+ src/pages/TCProfilePage.jsx        | 28 +++++------
+ src/pages/admin/SupportTickets.jsx | 19 ++++----
+ 13 files changed, 197 insertions(+), 138 deletions(-)
+ create mode 100644 src/hooks/useCurrentUser.js
+
+diff --git a/src/App.jsx b/src/App.jsx
+index 89d7341..53693cc 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -5,8 +5,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-d
+ import PageNotFound from "./lib/PageNotFound";
+ import { AuthProvider, useAuth } from "@/lib/AuthContext";
+ import UserNotRegisteredError from "@/components/UserNotRegisteredError";
+-import { useState, useEffect } from "react";
+-import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ 
+ import Layout from "./components/Layout";
+ import Onboarding from "./pages/Onboarding";
+@@ -31,22 +30,13 @@ import AdminSupportTickets from "./pages/admin/SupportTickets";
+ 
+ const AuthenticatedApp = () => {
+   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+-  const [user, setUser] = useState(null);
+-  const [loadingUser, setLoadingUser] = useState(true);
+-
+-  useEffect(() => {
+-    if (!isLoadingAuth && !isLoadingPublicSettings) {
+-      if (authError) {
+-        setLoadingUser(false);
+-      } else {
+-        let cancelled = false;
+-        base44.auth.me()
+-          .then((u) => { if (!cancelled) { setUser(u); setLoadingUser(false); } })
+-          .catch(() => { if (!cancelled) setLoadingUser(false); });
+-        return () => { cancelled = true; };
+-      }
+-    }
+-  }, [isLoadingAuth, isLoadingPublicSettings, authError]);
++
++  // Only fetch the user once the auth preflight is done and there's no authError.
++  // react-query dedupes this across the app — every other page/useCurrentUser()
++  // call will hit the same cache entry.
++  const { data: user, isLoading: loadingUser } = useCurrentUser({
++    enabled: !isLoadingAuth && !isLoadingPublicSettings && !authError,
++  });
+ 
+   if (isLoadingPublicSettings || isLoadingAuth || loadingUser) {
+     return (
+diff --git a/src/hooks/useCurrentUser.js b/src/hooks/useCurrentUser.js
+new file mode 100644
+index 0000000..5ebcc8d
+--- /dev/null
++++ b/src/hooks/useCurrentUser.js
+@@ -0,0 +1,77 @@
++import { useQuery, useQueryClient } from '@tanstack/react-query';
++import { base44 } from '@/api/base44Client';
++
++/**
++ * React Query key for the current user. Exported so other modules can
++ * invalidate or write directly to the cache after mutations.
++ */
++export const CURRENT_USER_KEY = ['currentUser'];
++
++/**
++ * Single source of truth for the authenticated user.
++ *
++ * Replaces the previous pattern of every page doing:
++ *   const [user, setUser] = useState(null);
++ *   useEffect(() => { base44.auth.me().then(setUser); }, []);
++ *
++ * which caused:
++ *   - 16 redundant network calls across route transitions
++ *   - duplicated loading state in every page
++ *   - no dedup when two components needed the user in the same render
++ *
++ * Usage:
++ *   const { data: user, isLoading } = useCurrentUser();
++ *
++ * Conditional fetch (e.g., wait for auth check to finish before fetching):
++ *   const { data: user } = useCurrentUser({ enabled: !isLoadingAuth });
++ *
++ * @param {object} [options] - Forwarded to useQuery (enabled, staleTime, etc.)
++ */
++export function useCurrentUser(options = {}) {
++  return useQuery({
++    queryKey: CURRENT_USER_KEY,
++    queryFn: () => base44.auth.me(),
++    staleTime: 5 * 60 * 1000, // 5 minutes — auth data doesn't change often
++    retry: 1,
++    ...options,
++  });
++}
++
++/**
++ * Hook that returns a function to invalidate the current-user cache.
++ * Call after any mutation that changes user state (updateMe, role change, etc.)
++ * so the next consumer sees fresh data.
++ *
++ * Usage:
++ *   const invalidateUser = useInvalidateCurrentUser();
++ *   await base44.auth.updateMe({ member_type: 'tc' });
++ *   await invalidateUser();  // forces refetch on next useCurrentUser call
++ */
++export function useInvalidateCurrentUser() {
++  const queryClient = useQueryClient();
++  return () => queryClient.invalidateQueries({ queryKey: CURRENT_USER_KEY });
++}
++
++/**
++ * Hook that returns a function to imperatively fetch the latest user data,
++ * bypassing the cache. Use when you need fresh data right now (e.g., after
++ * an update, before reading derived fields).
++ *
++ * Returns a promise resolving to the fresh user object.
++ *
++ * Usage:
++ *   const refetchUser = useRefetchCurrentUser();
++ *   await base44.auth.updateMe({ ... });
++ *   const freshUser = await refetchUser();
++ */
++export function useRefetchCurrentUser() {
++  const queryClient = useQueryClient();
++  return async () => {
++    const data = await queryClient.fetchQuery({
++      queryKey: CURRENT_USER_KEY,
++      queryFn: () => base44.auth.me(),
++      staleTime: 0,
++    });
++    return data;
++  };
++}
+diff --git a/src/lib/PageNotFound.jsx b/src/lib/PageNotFound.jsx
+index cce903d..e7a5d09 100644
+--- a/src/lib/PageNotFound.jsx
++++ b/src/lib/PageNotFound.jsx
+@@ -1,23 +1,14 @@
+ import { useLocation } from 'react-router-dom';
+-import { base44 } from '@/api/base44Client';
+-import { useQuery } from '@tanstack/react-query';
++import { useCurrentUser } from '@/hooks/useCurrentUser';
+ 
+ 
+ export default function PageNotFound({}) {
+     const location = useLocation();
+     const pageName = location.pathname.substring(1);
+ 
+-    const { data: authData, isFetched } = useQuery({
+-        queryKey: ['user'],
+-        queryFn: async () => {
+-            try {
+-                const user = await base44.auth.me();
+-                return { user, isAuthenticated: true };
+-            } catch (error) {
+-                return { user: null, isAuthenticated: false };
+-            }
+-        }
+-    });
++    // useCurrentUser handles both authenticated and unauthenticated cases.
++    // If the user isn't authenticated, the query errors and data stays undefined.
++    const { data: user, isFetched } = useCurrentUser({ retry: false });
+     
+     return (
+         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+@@ -40,7 +31,7 @@ export default function PageNotFound({}) {
+                     </div>
+                     
+                     {/* Admin Note */}
+-                    {isFetched && authData.isAuthenticated && authData.user?.role === 'admin' && (
++                    {isFetched && user?.role === 'admin' && (
+                         <div className="mt-8 p-4 bg-slate-100 rounded-lg border border-slate-200">
+                             <div className="flex items-start space-x-3">
+                                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center mt-0.5">
+diff --git a/src/pages/Dashboard.jsx b/src/pages/Dashboard.jsx
+index 092c988..6b88a0d 100644
+--- a/src/pages/Dashboard.jsx
++++ b/src/pages/Dashboard.jsx
+@@ -1,18 +1,13 @@
+-import { useState, useEffect } from "react";
+-import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import TCDashboard from "./dashboard/TCDashboard";
+ import InvestorDashboard from "./dashboard/InvestorDashboard";
+ import PMLDashboard from "./dashboard/PMLDashboard";
+ import AdminDashboard from "./dashboard/AdminDashboard";
+ 
+ export default function Dashboard() {
+-  const [user, setUser] = useState(null);
++  const { data: user, isLoading } = useCurrentUser();
+ 
+-  useEffect(() => {
+-    base44.auth.me().then(setUser).catch(() => {});
+-  }, []);
+-
+-  if (!user) {
++  if (isLoading || !user) {
+     return (
+       <div className="flex items-center justify-center py-24">
+         <div className="w-8 h-8 border-4 border-muted border-t-teal rounded-full animate-spin" />
+diff --git a/src/pages/DealBoard.jsx b/src/pages/DealBoard.jsx
+index a8d7b9f..fdb7592 100644
+--- a/src/pages/DealBoard.jsx
++++ b/src/pages/DealBoard.jsx
+@@ -1,5 +1,6 @@
+ import { useState, useEffect, useCallback } from "react";
+ import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import DealCard from "@/components/deals/DealCard";
+ import DealFilters from "@/components/deals/DealFilters";
+ import DealDetailModal from "@/components/deals/DealDetailModal";
+@@ -12,7 +13,7 @@ import { Plus, Briefcase, Layers } from "lucide-react";
+ const EMPTY_FILTERS = { search: "", property_type: "all", deal_type: "all", state: "all", status: "all" };
+ 
+ export default function DealBoard() {
+-  const [user, setUser] = useState(null);
++  const { data: user } = useCurrentUser();
+   const [deals, setDeals] = useState([]);
+   const [applications, setApplications] = useState([]);
+   const [tcProfiles, setTcProfiles] = useState({});
+@@ -24,14 +25,13 @@ export default function DealBoard() {
+   const [activeTab, setActiveTab] = useState("board"); // board | matches (investor only)
+ 
+   const loadData = useCallback(async () => {
+-    const u = await base44.auth.me();
+-    setUser(u);
++    if (!user) return;
+ 
+     const allDeals = await base44.entities.Deal.list("-created_date", 100);
+     setDeals(allDeals);
+ 
+-    if (u.role === "investor") {
+-      const myDeals = allDeals.filter(d => d.investor_id === u.id);
++    if (user.role === "investor") {
++      const myDeals = allDeals.filter(d => d.investor_id === user.id);
+       const dealIds = myDeals.map(d => d.id);
+       if (dealIds.length > 0) {
+         const apps = await base44.entities.DealApplication.list("-created_date", 200);
+@@ -49,14 +49,14 @@ export default function DealBoard() {
+       }
+     }
+ 
+-    if (u.role === "tc") {
++    if (user.role === "tc") {
+       // Load own TC profile for match display
+-      const profiles = await base44.entities.TCProfile.filter({ user_id: u.id });
+-      if (profiles[0]) setTcProfiles({ [u.id]: profiles[0] });
++      const profiles = await base44.entities.TCProfile.filter({ user_id: user.id });
++      if (profiles[0]) setTcProfiles({ [user.id]: profiles[0] });
+     }
+ 
+     setLoading(false);
+-  }, []);
++  }, [user]);
+ 
+   useEffect(() => { loadData(); }, [loadData]);
+ 
+diff --git a/src/pages/InvestorProfilePage.jsx b/src/pages/InvestorProfilePage.jsx
+index ef5bcb4..0d0f196 100644
+--- a/src/pages/InvestorProfilePage.jsx
++++ b/src/pages/InvestorProfilePage.jsx
+@@ -1,5 +1,6 @@
+-import { useState, useEffect } from "react";
++import { useState, useEffect, useCallback } from "react";
+ import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { useSearchParams, useNavigate } from "react-router-dom";
+ import InvestorProfileEditForm from "../components/profile/InvestorProfileEditForm";
+ import TagPill from "../components/TagPill";
+@@ -23,7 +24,7 @@ export default function InvestorProfilePage() {
+   const navigate = useNavigate();
+   const profileUserId = searchParams.get("id");
+ 
+-  const [currentUser, setCurrentUser] = useState(null);
++  const { data: currentUser } = useCurrentUser();
+   const [profile, setProfile] = useState(null);
+   const [profileUser, setProfileUser] = useState(null);
+   const [loading, setLoading] = useState(true);
+@@ -32,23 +33,22 @@ export default function InvestorProfilePage() {
+ 
+   const isOwner = !profileUserId || profileUserId === currentUser?.id;
+ 
+-  useEffect(() => { load(); }, [profileUserId]);
+-
+-  const load = async () => {
++  const load = useCallback(async () => {
++    if (!currentUser) return;
+     setLoading(true);
+-    const me = await base44.auth.me();
+-    setCurrentUser(me);
+-    const targetId = profileUserId || me.id;
++    const targetId = profileUserId || currentUser.id;
+ 
+     const profiles = await base44.entities.InvestorProfile.filter({ user_id: targetId });
+     if (profiles.length > 0) setProfile(profiles[0]);
+ 
+-    if (!profileUserId || profileUserId === me.id) {
+-      setProfileUser(me);
++    if (!profileUserId || profileUserId === currentUser.id) {
++      setProfileUser(currentUser);
+     }
+ 
+     setLoading(false);
+-  };
++  }, [currentUser, profileUserId]);
++
++  useEffect(() => { load(); }, [load]);
+ 
+   const handleSave = async (formData) => {
+     setSaving(true);
+diff --git a/src/pages/Messages.jsx b/src/pages/Messages.jsx
+index ccbfbdf..ef59033 100644
+--- a/src/pages/Messages.jsx
++++ b/src/pages/Messages.jsx
+@@ -1,5 +1,6 @@
+ import { useState, useEffect, useRef } from "react";
+ import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { Send, Paperclip, Plus, X, FileText, MessageSquare, ChevronLeft } from "lucide-react";
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+@@ -9,7 +10,7 @@ import { format } from "date-fns";
+ import { toast } from "sonner";
+ 
+ export default function Messages() {
+-  const [user, setUser] = useState(null);
++  const { data: user } = useCurrentUser();
+   const [threads, setThreads] = useState([]);
+   const [selectedThread, setSelectedThread] = useState(null);
+   const [messages, setMessages] = useState([]);
+@@ -25,26 +26,22 @@ export default function Messages() {
+   const [showMobileConvo, setShowMobileConvo] = useState(false);
+   const messagesEndRef = useRef(null);
+   const fileInputRef = useRef(null);
+-  const currentUser = useRef(null);
+ 
++  // Initial data load — wait for user to resolve, then fetch dependents.
+   useEffect(() => {
+-    init();
+-  }, []);
+-
+-  const init = async () => {
+-    const u = await base44.auth.me();
+-    setUser(u);
+-    currentUser.current = u;
+-    try {
+-      const users = await base44.entities.User.list();
+-      setAllUsers(users.filter(usr => usr.id !== u.id));
+-    } catch {}
+-    
+-    await loadThreads(u);
+-  };
++    if (!user) return;
++    (async () => {
++      try {
++        const users = await base44.entities.User.list();
++        setAllUsers(users.filter(usr => usr.id !== user.id));
++      } catch {}
++      await loadThreads(user);
++    })();
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [user?.id]);
+ 
+   const loadThreads = async (u) => {
+-    const u_ = u || currentUser.current;
++    const u_ = u || user;
+     if (!u_) return;
+     const all = await base44.entities.MessageThread.list('-last_message_at', 200);
+     setThreads(all.filter(t => t.participants?.includes(u_.id)));
+diff --git a/src/pages/Onboarding.jsx b/src/pages/Onboarding.jsx
+index b88e757..e57dd56 100644
+--- a/src/pages/Onboarding.jsx
++++ b/src/pages/Onboarding.jsx
+@@ -1,6 +1,7 @@
+ import { useState, useEffect } from "react";
+ import { useNavigate } from "react-router-dom";
+ import { base44 } from "@/api/base44Client";
++import { useRefetchCurrentUser, useInvalidateCurrentUser } from "@/hooks/useCurrentUser";
+ import Logo from "../components/Logo";
+ import OnboardingProgress from "../components/onboarding/OnboardingProgress";
+ import MemberTypeStep from "../components/onboarding/MemberTypeStep";
+@@ -14,6 +15,8 @@ import PendingApprovalStep from "../components/onboarding/PendingApprovalStep";
+ 
+ export default function Onboarding() {
+   const navigate = useNavigate();
++  const refetchUser = useRefetchCurrentUser();
++  const invalidateUser = useInvalidateCurrentUser();
+   const [step, setStep] = useState("member_type");
+   const [loading, setLoading] = useState(true);
+   const [paymentError, setPaymentError] = useState("");
+@@ -24,6 +27,7 @@ export default function Onboarding() {
+ 
+   useEffect(() => {
+     loadUserState();
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+ 
+   const loadUserState = async () => {
+@@ -37,7 +41,7 @@ export default function Onboarding() {
+ 
+     let user = null;
+     try {
+-      user = await base44.auth.me();
++      user = await refetchUser();
+     } catch (e) {
+       setLoading(false);
+       return;
+@@ -63,6 +67,7 @@ export default function Onboarding() {
+         try {
+           const res = await base44.functions.invoke("verifyCheckoutSession", { sessionId });
+           if (res.data?.success) {
++            await invalidateUser(); // server updated onboarding_step server-side
+             setStep("nda");
+             setLoading(false);
+             return;
+@@ -101,6 +106,7 @@ export default function Onboarding() {
+       member_type: formData.member_type,
+       onboarding_step: "plan_selection",
+     });
++    await invalidateUser();
+     setStep("plan_selection");
+   };
+ 
+@@ -109,22 +115,24 @@ export default function Onboarding() {
+       selected_plan: formData.selected_plan,
+       onboarding_step: "checkout",
+     });
++    await invalidateUser();
+     setStep("checkout");
+   };
+ 
+   const handleNDAAccept = async () => {
+-    const user = await base44.auth.me();
++    const user = await refetchUser();
+     await base44.auth.updateMe({
+       onboarding_step: "non_compete",
+       nda_accepted: true,
+       nda_accepted_date: new Date().toISOString(),
+       nda_signer_name: user.full_name,
+     });
++    await invalidateUser();
+     setStep("non_compete");
+   };
+ 
+   const handleNonCompeteAccept = async () => {
+-    const user = await base44.auth.me();
++    const user = await refetchUser();
+     const now = new Date().toISOString();
+     await base44.auth.updateMe({
+       onboarding_step: "pending_approval",
+@@ -133,7 +141,7 @@ export default function Onboarding() {
+       non_compete_accepted_date: now,
+       non_compete_signer_name: user.full_name,
+     });
+-    const freshUser = await base44.auth.me();
++    const freshUser = await refetchUser();
+     await base44.entities.MemberApplication.create({
+       email: freshUser.email,
+       full_name: freshUser.full_name,
+@@ -153,11 +161,13 @@ export default function Onboarding() {
+ 
+   const handleNDADecline = async () => {
+     await base44.auth.updateMe({ onboarding_step: "member_type" });
++    await invalidateUser();
+     setStep("member_type");
+   };
+ 
+   const handleNonCompeteDecline = async () => {
+     await base44.auth.updateMe({ onboarding_step: "nda" });
++    await invalidateUser();
+     setStep("nda");
+   };
+ 
+diff --git a/src/pages/PMLProfilePage.jsx b/src/pages/PMLProfilePage.jsx
+index 927665b..a4e2b7f 100644
+--- a/src/pages/PMLProfilePage.jsx
++++ b/src/pages/PMLProfilePage.jsx
+@@ -1,5 +1,6 @@
+-import { useState, useEffect } from "react";
++import { useState, useEffect, useCallback } from "react";
+ import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { useSearchParams } from "react-router-dom";
+ import PMLLendingCriteria from "../components/profile/PMLLendingCriteria";
+ import PMLProfileEditForm from "../components/profile/PMLProfileEditForm";
+@@ -21,26 +22,23 @@ export default function PMLProfilePage() {
+   const [searchParams] = useSearchParams();
+   const profileUserId = searchParams.get("id");
+ 
+-  const [currentUser, setCurrentUser] = useState(null);
++  const { data: currentUser } = useCurrentUser();
+   const [profile, setProfile] = useState(null);
+   const [profileUser, setProfileUser] = useState(null);
+   const [loading, setLoading] = useState(true);
+   const [editing, setEditing] = useState(false);
+   const [saving, setSaving] = useState(false);
+ 
+-  useEffect(() => { load(); }, [profileUserId]);
+-
+-  const load = async () => {
++  const load = useCallback(async () => {
++    if (!currentUser) return;
+     setLoading(true);
+-    const me = await base44.auth.me();
+-    setCurrentUser(me);
+-    const targetId = profileUserId || me.id;
++    const targetId = profileUserId || currentUser.id;
+ 
+     const profiles = await base44.entities.PMLProfile.filter({ user_id: targetId });
+     if (profiles.length > 0) setProfile(profiles[0]);
+ 
+-    if (!profileUserId || profileUserId === me.id) {
+-      setProfileUser(me);
++    if (!profileUserId || profileUserId === currentUser.id) {
++      setProfileUser(currentUser);
+     } else {
+       try {
+         const users = await base44.entities.User.filter({ id: targetId });
+@@ -49,7 +47,9 @@ export default function PMLProfilePage() {
+     }
+ 
+     setLoading(false);
+-  };
++  }, [currentUser, profileUserId]);
++
++  useEffect(() => { load(); }, [load]);
+ 
+   const handleSave = async (formData) => {
+     setSaving(true);
+diff --git a/src/pages/ServiceRequests.jsx b/src/pages/ServiceRequests.jsx
+index e0c5917..7936384 100644
+--- a/src/pages/ServiceRequests.jsx
++++ b/src/pages/ServiceRequests.jsx
+@@ -1,5 +1,6 @@
+ import { useState, useEffect, useRef } from "react";
+ import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import {
+   Plus, X, FileText, Upload, CheckCircle2, Clock, Loader2, Award, ChevronLeft, Send
+ } from "lucide-react";
+@@ -70,7 +71,7 @@ function ProgressStepper({ status }) {
+ }
+ 
+ export default function ServiceRequests() {
+-  const [user, setUser] = useState(null);
++  const { data: user } = useCurrentUser();
+   const [requests, setRequests] = useState([]);
+   const [selected, setSelected] = useState(null);
+   const [showMobileDetail, setShowMobileDetail] = useState(false);
+@@ -85,17 +86,16 @@ export default function ServiceRequests() {
+   const [saving, setSaving] = useState(false);
+   const fileInputRef = useRef(null);
+ 
++  // Load dependents once the user resolves.
+   useEffect(() => {
+-    init();
+-  }, []);
+-
+-  const init = async () => {
+-    const u = await base44.auth.me();
+-    setUser(u);
+-    const users = await base44.entities.User.list();
+-    setAllUsers(users.filter(usr => usr.id !== u.id));
+-    await loadRequests(u);
+-  };
++    if (!user) return;
++    (async () => {
++      const users = await base44.entities.User.list();
++      setAllUsers(users.filter(usr => usr.id !== user.id));
++      await loadRequests(user);
++    })();
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [user?.id]);
+ 
+   const loadRequests = async (u) => {
+     const u_ = u || user;
+diff --git a/src/pages/SupportTickets.jsx b/src/pages/SupportTickets.jsx
+index 0757796..5b8c6ea 100644
+--- a/src/pages/SupportTickets.jsx
++++ b/src/pages/SupportTickets.jsx
+@@ -1,5 +1,6 @@
+-import { useState, useEffect } from "react";
++import { useState, useEffect, useCallback } from "react";
+ import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { Plus, LifeBuoy, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+ import { Button } from "@/components/ui/button";
+ import { toast } from "sonner";
+@@ -20,7 +21,7 @@ const PRIORITY_STYLES = {
+ };
+ 
+ export default function SupportTickets() {
+-  const [user, setUser] = useState(null);
++  const { data: user } = useCurrentUser();
+   const [tickets, setTickets] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [showForm, setShowForm] = useState(false);
+@@ -30,17 +31,16 @@ export default function SupportTickets() {
+   const [commentingId, setCommentingId] = useState(null);
+   const [form, setForm] = useState({ subject: "", description: "", priority: "medium" });
+ 
+-  useEffect(() => {
+-    load();
+-  }, []);
+-
+-  const load = async () => {
+-    const u = await base44.auth.me();
+-    setUser(u);
+-    const all = await base44.entities.SupportTicket.filter({ reported_by_user_id: u.id }, "-created_date");
++  const load = useCallback(async () => {
++    if (!user) return;
++    const all = await base44.entities.SupportTicket.filter({ reported_by_user_id: user.id }, "-created_date");
+     setTickets(all);
+     setLoading(false);
+-  };
++  }, [user]);
++
++  useEffect(() => {
++    load();
++  }, [load]);
+ 
+   const handleSubmit = async () => {
+     if (!form.subject.trim() || !form.description.trim()) {
+diff --git a/src/pages/TCProfilePage.jsx b/src/pages/TCProfilePage.jsx
+index 3639547..754b45f 100644
+--- a/src/pages/TCProfilePage.jsx
++++ b/src/pages/TCProfilePage.jsx
+@@ -1,5 +1,6 @@
+-import { useState, useEffect } from "react";
++import { useState, useEffect, useCallback } from "react";
+ import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { useSearchParams } from "react-router-dom";
+ import ReviewForm from "../components/reviews/ReviewForm";
+ import TCStatBar from "../components/profile/TCStatBar";
+@@ -18,7 +19,7 @@ export default function TCProfilePage() {
+   const [searchParams] = useSearchParams();
+   const profileUserId = searchParams.get("id");
+ 
+-  const [currentUser, setCurrentUser] = useState(null);
++  const { data: currentUser } = useCurrentUser();
+   const [profile, setProfile] = useState(null);
+   const [profileUser, setProfileUser] = useState(null);
+   const [reviews, setReviews] = useState([]);
+@@ -29,15 +30,10 @@ export default function TCProfilePage() {
+ 
+   const isOwner = !profileUserId || profileUserId === currentUser?.id;
+ 
+-  useEffect(() => {
+-    load();
+-  }, [profileUserId]);
+-
+-  const load = async () => {
++  const load = useCallback(async () => {
++    if (!currentUser) return;
+     setLoading(true);
+-    const me = await base44.auth.me();
+-    setCurrentUser(me);
+-    const targetId = profileUserId || me.id;
++    const targetId = profileUserId || currentUser.id;
+ 
+     const profiles = await base44.entities.TCProfile.filter({ user_id: targetId });
+     if (profiles.length > 0) {
+@@ -46,9 +42,9 @@ export default function TCProfilePage() {
+       setReviews(revs);
+     }
+ 
+-    // For own profile use me; for others (admin viewing) try User entity
+-    if (!profileUserId || profileUserId === me.id) {
+-      setProfileUser(me);
++    // For own profile use currentUser; for others (admin viewing) try User entity
++    if (!profileUserId || profileUserId === currentUser.id) {
++      setProfileUser(currentUser);
+     } else {
+       try {
+         const users = await base44.entities.User.filter({ id: targetId });
+@@ -57,7 +53,11 @@ export default function TCProfilePage() {
+     }
+ 
+     setLoading(false);
+-  };
++  }, [currentUser, profileUserId]);
++
++  useEffect(() => {
++    load();
++  }, [load]);
+ 
+   const handleSave = async (formData) => {
+     setSaving(true);
+diff --git a/src/pages/admin/SupportTickets.jsx b/src/pages/admin/SupportTickets.jsx
+index 01ab0ec..4f64ef9 100644
+--- a/src/pages/admin/SupportTickets.jsx
++++ b/src/pages/admin/SupportTickets.jsx
+@@ -1,5 +1,6 @@
+-import { useState, useEffect } from "react";
++import { useState, useEffect, useCallback } from "react";
+ import { base44 } from "@/api/base44Client";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { LifeBuoy, Loader2, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+ import { Button } from "@/components/ui/button";
+ import { toast } from "sonner";
+@@ -20,7 +21,7 @@ const PRIORITY_STYLES = {
+ };
+ 
+ export default function AdminSupportTickets() {
+-  const [user, setUser] = useState(null);
++  const { data: user } = useCurrentUser();
+   const [tickets, setTickets] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [expandedId, setExpandedId] = useState(null);
+@@ -28,17 +29,15 @@ export default function AdminSupportTickets() {
+   const [commentingId, setCommentingId] = useState(null);
+   const [filter, setFilter] = useState("all");
+ 
+-  useEffect(() => {
+-    load();
+-  }, []);
+-
+-  const load = async () => {
+-    const u = await base44.auth.me();
+-    setUser(u);
++  const load = useCallback(async () => {
+     const all = await base44.entities.SupportTicket.list("-created_date");
+     setTickets(all);
+     setLoading(false);
+-  };
++  }, []);
++
++  useEffect(() => {
++    load();
++  }, [load]);
+ 
+   const updateStatus = async (ticket, status) => {
+     await base44.entities.SupportTicket.update(ticket.id, { status });
+-- 
+2.43.0
+
