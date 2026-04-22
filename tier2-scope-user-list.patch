@@ -1,0 +1,204 @@
+From b18391411fa236ee3f3fc8677c1028a7c27aa76c Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Wed, 22 Apr 2026 20:44:15 +0000
+Subject: [PATCH] T2.3: Scope 6 of 8 User.list() calls with server-side filters
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Audit item T2.3 — the scale unblocker. Previously 8 places loaded the
+full User table to build lookup maps or populate pickers. This leaked
+every user's PII (email, phone, company) to any authenticated member
+and will not scale past a few hundred members.
+
+Migrated (6 sites):
+- src/pages/InvestorDirectory.jsx: User.filter({ role: 'investor' })
+- src/pages/PMLDirectory.jsx:      User.filter({ role: 'pml' })
+- src/pages/TCDirectory.jsx:       User.filter({ role: 'tc' })
+- src/pages/Messages.jsx:          User.filter({ member_status: 'approved' })
+  (picker now excludes pending/rejected users — correctness bonus)
+- src/pages/ServiceRequests.jsx:   User.filter({ role: <opposite> }) or
+                                    { member_status: 'approved' } for admin
+  (counterparty picker scoped to opposite role — a TC only sees investors)
+- src/pages/admin/Applications.jsx: User.filter({ member_status: 'pending' })
+  (replaces the OR of onboarding_step / member_status — both are set
+  together in Onboarding.jsx so member_status='pending' catches both)
+
+Intentionally kept (2 sites) with TODO comments:
+- src/pages/admin/Members.jsx: admin member-management needs full table;
+  pagination tracked as T3.4
+- src/pages/dashboard/AdminDashboard.jsx: stats dashboard genuinely needs
+  aggregate counts; server-side aggregation tracked as T3.4
+
+Net effect:
+- Directory pages no longer pull non-role users into memory
+- Pickers exclude unapproved users (correctness)
+- Admin Applications query is 10-100x smaller at scale
+- Zero behavioral regression for the 2 retained admin sites
+
+Verification:
+- npm run lint: 0 errors (full codebase)
+- npm run build: succeeds
+- User.list() calls: 8 -> 2 (both intentional, both documented)
+- User.filter() calls with role/status scoping: 9 (up from 2)
+---
+ src/pages/InvestorDirectory.jsx        |  5 ++++-
+ src/pages/Messages.jsx                 |  7 ++++++-
+ src/pages/PMLDirectory.jsx             |  3 ++-
+ src/pages/ServiceRequests.jsx          | 18 ++++++++++++++++--
+ src/pages/TCDirectory.jsx              |  3 ++-
+ src/pages/admin/Applications.jsx       | 14 ++++++++------
+ src/pages/admin/Members.jsx            |  2 ++
+ src/pages/dashboard/AdminDashboard.jsx |  3 +++
+ 8 files changed, 43 insertions(+), 12 deletions(-)
+
+diff --git a/src/pages/InvestorDirectory.jsx b/src/pages/InvestorDirectory.jsx
+index 434eb65..28e880c 100644
+--- a/src/pages/InvestorDirectory.jsx
++++ b/src/pages/InvestorDirectory.jsx
+@@ -24,7 +24,10 @@ export default function InvestorDirectory() {
+     setLoading(true);
+     const all = await base44.entities.InvestorProfile.filter({ is_published: true });
+     try {
+-      const users = await base44.entities.User.list();
++      // Only fetch users with the investor role instead of the full user table.
++      // This directory only ever renders investor profiles, so any other roles
++      // in the lookup map are wasted bytes + a PII disclosure.
++      const users = await base44.entities.User.filter({ role: "investor" });
+       const map = {};
+       users.forEach((u) => { map[u.id] = u; });
+       setUserMap(map);
+diff --git a/src/pages/Messages.jsx b/src/pages/Messages.jsx
+index ef59033..d760d45 100644
+--- a/src/pages/Messages.jsx
++++ b/src/pages/Messages.jsx
+@@ -32,7 +32,12 @@ export default function Messages() {
+     if (!user) return;
+     (async () => {
+       try {
+-        const users = await base44.entities.User.list();
++        // Scope the picker to approved members only. Previously this pulled
++        // every user in the system and filtered client-side, which both leaked
++        // PII (pending/rejected users' emails and names) and showed users
++        // that shouldn't be message-able. Server-side filter is smaller +
++        // correct.
++        const users = await base44.entities.User.filter({ member_status: "approved" });
+         setAllUsers(users.filter(usr => usr.id !== user.id));
+       } catch {}
+       await loadThreads(user);
+diff --git a/src/pages/PMLDirectory.jsx b/src/pages/PMLDirectory.jsx
+index 4666937..851b59d 100644
+--- a/src/pages/PMLDirectory.jsx
++++ b/src/pages/PMLDirectory.jsx
+@@ -32,7 +32,8 @@ export default function PMLDirectory() {
+     setProfiles(pmls);
+     if (pmls.length > 0) {
+       try {
+-        const users = await base44.entities.User.list();
++        // Scoped to PML-role users (directory only renders PML profiles).
++        const users = await base44.entities.User.filter({ role: "pml" });
+         const map = {};
+         users.forEach((u) => { map[u.id] = u; });
+         setUserMap(map);
+diff --git a/src/pages/ServiceRequests.jsx b/src/pages/ServiceRequests.jsx
+index 7936384..588a0e8 100644
+--- a/src/pages/ServiceRequests.jsx
++++ b/src/pages/ServiceRequests.jsx
+@@ -90,8 +90,22 @@ export default function ServiceRequests() {
+   useEffect(() => {
+     if (!user) return;
+     (async () => {
+-      const users = await base44.entities.User.list();
+-      setAllUsers(users.filter(usr => usr.id !== user.id));
++      // Service requests are always between an investor and a TC.
++      // Scope the counterparty picker to the OPPOSITE role so we don't
++      // pull the full user table — e.g., a TC only needs to see investors.
++      // Admins can pick anyone approved (fallback to approved-status filter).
++      let counterparties = [];
++      try {
++        if (user.role === "tc") {
++          counterparties = await base44.entities.User.filter({ role: "investor" });
++        } else if (user.role === "investor") {
++          counterparties = await base44.entities.User.filter({ role: "tc" });
++        } else {
++          // admin or other: show approved members only
++          counterparties = await base44.entities.User.filter({ member_status: "approved" });
++        }
++      } catch {}
++      setAllUsers(counterparties.filter(usr => usr.id !== user.id));
+       await loadRequests(user);
+     })();
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+diff --git a/src/pages/TCDirectory.jsx b/src/pages/TCDirectory.jsx
+index d495f8b..9dcba99 100644
+--- a/src/pages/TCDirectory.jsx
++++ b/src/pages/TCDirectory.jsx
+@@ -55,7 +55,8 @@ export default function TCDirectory() {
+ 
+     if (tcProfiles.length > 0) {
+       try {
+-        const users = await base44.entities.User.list();
++        // Scoped to TC-role users (directory only renders TC profiles).
++        const users = await base44.entities.User.filter({ role: "tc" });
+         const map = {};
+         users.forEach((u) => { map[u.id] = u; });
+         setUserMap(map);
+diff --git a/src/pages/admin/Applications.jsx b/src/pages/admin/Applications.jsx
+index e907236..41ea69e 100644
+--- a/src/pages/admin/Applications.jsx
++++ b/src/pages/admin/Applications.jsx
+@@ -39,16 +39,18 @@ export default function Applications() {
+   }, []);
+ 
+   const loadApplications = async () => {
+-    const [apps, users] = await Promise.all([
++    const [apps, pendingUsersRaw] = await Promise.all([
+       base44.entities.MemberApplication.list("-created_date"),
+-      base44.entities.User.list(),
++      // Scope server-side to pending members instead of pulling the full user
++      // table. Per Onboarding.jsx, `member_status: "pending"` is set together
++      // with `onboarding_step: "pending_approval"` — so this filter catches
++      // both conditions the client previously OR'd together.
++      base44.entities.User.filter({ member_status: "pending" }),
+     ]);
+ 
+-    // Add synthetic entries for users pending approval who have no MemberApplication
++    // Add synthetic entries for pending users who have no MemberApplication.
+     const appUserIds = new Set(apps.map(a => a.user_id).filter(Boolean));
+-    const pendingUsers = users.filter(
+-      u => (u.onboarding_step === "pending_approval" || u.member_status === "pending") && !appUserIds.has(u.id)
+-    );
++    const pendingUsers = pendingUsersRaw.filter(u => !appUserIds.has(u.id));
+     const syntheticApps = pendingUsers.map(u => ({
+       id: "user_" + u.id,
+       user_id: u.id,
+diff --git a/src/pages/admin/Members.jsx b/src/pages/admin/Members.jsx
+index a1e4615..2ff4d8e 100644
+--- a/src/pages/admin/Members.jsx
++++ b/src/pages/admin/Members.jsx
+@@ -53,6 +53,8 @@ export default function Members() {
+   }, []);
+ 
+   const load = async () => {
++    // Admin member-management needs the full user table. Pagination is tracked
++    // as T3.4 — at scale this should become a paginated server-side query.
+     const users = await base44.entities.User.list("-created_date");
+     setMembers(users);
+     setLoading(false);
+diff --git a/src/pages/dashboard/AdminDashboard.jsx b/src/pages/dashboard/AdminDashboard.jsx
+index beec160..803c581 100644
+--- a/src/pages/dashboard/AdminDashboard.jsx
++++ b/src/pages/dashboard/AdminDashboard.jsx
+@@ -31,6 +31,9 @@ export default function AdminDashboard({ user }) {
+   const load = async () => {
+     const [apps, users, deals_, threads, revs] = await Promise.all([
+       base44.entities.MemberApplication.list('-created_date'),
++      // Admin dashboard needs the full user table for role breakdown charts
++      // and total member counts. At scale (>~500 members) this should move
++      // to a server-side stats aggregation — tracked as T3.4.
+       base44.entities.User.list(),
+       base44.entities.Deal.list(),
+       base44.entities.MessageThread.list(),
+-- 
+2.43.0
+
