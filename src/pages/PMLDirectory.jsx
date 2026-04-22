@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import PMLCard from "../components/directory/PMLCard";
 import { Input } from "@/components/ui/input";
@@ -16,31 +17,32 @@ const LTV_OPTIONS = [
 ];
 
 export default function PMLDirectory() {
-  const [profiles, setProfiles] = useState([]);
-  const [userMap, setUserMap] = useState({});
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [loanType, setLoanType] = useState("All Types");
   const [state, setState] = useState("All States");
   const [minLtv, setMinLtv] = useState("any");
 
-  useEffect(() => { load(); }, []);
+  // Published PML profiles.
+  const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
+    queryKey: ['PMLProfile', { is_published: true }],
+    queryFn: () => base44.entities.PMLProfile.filter({ is_published: true }),
+  });
 
-  const load = async () => {
-    setLoading(true);
-    const pmls = await base44.entities.PMLProfile.filter({ is_published: true });
-    setProfiles(pmls);
-    if (pmls.length > 0) {
-      try {
-        // Scoped to PML-role users (directory only renders PML profiles).
-        const users = await base44.entities.User.filter({ role: "pml" });
-        const map = {};
-        users.forEach((u) => { map[u.id] = u; });
-        setUserMap(map);
-      } catch {}
-    }
-    setLoading(false);
-  };
+  // PML-role users — only fetch if there are profiles to enrich.
+  const { data: users = [] } = useQuery({
+    queryKey: ['User', { role: 'pml' }],
+    queryFn: () => base44.entities.User.filter({ role: "pml" }),
+    enabled: profiles.length > 0,
+  });
+
+  // Derive userMap from the users query — no extra state, no extra effect.
+  const userMap = useMemo(() => {
+    const map = {};
+    users.forEach((u) => { map[u.id] = u; });
+    return map;
+  }, [users]);
+
+  const loading = loadingProfiles;
 
   const parseLtv = (ltvStr) => {
     if (!ltvStr) return 0;

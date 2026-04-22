@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import TCCard from "../components/directory/TCCard";
 import { Input } from "@/components/ui/input";
@@ -35,35 +36,32 @@ const AVAILABILITY = [
 ];
 
 export default function TCDirectory() {
-  const [profiles, setProfiles] = useState([]);
-  const [userMap, setUserMap] = useState({});
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [specialty, setSpecialty] = useState("All Specialties");
   const [state, setState] = useState("All States");
   const [minRating, setMinRating] = useState("0");
   const [availability, setAvailability] = useState("all");
 
-  useEffect(() => {
-    load();
-  }, []);
+  // Published TC profiles.
+  const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
+    queryKey: ['TCProfile', { is_published: true }],
+    queryFn: () => base44.entities.TCProfile.filter({ is_published: true }),
+  });
 
-  const load = async () => {
-    setLoading(true);
-    const tcProfiles = await base44.entities.TCProfile.filter({ is_published: true });
-    setProfiles(tcProfiles);
+  // TC-role users — only fetch if there are profiles to enrich.
+  const { data: users = [] } = useQuery({
+    queryKey: ['User', { role: 'tc' }],
+    queryFn: () => base44.entities.User.filter({ role: "tc" }),
+    enabled: profiles.length > 0,
+  });
 
-    if (tcProfiles.length > 0) {
-      try {
-        // Scoped to TC-role users (directory only renders TC profiles).
-        const users = await base44.entities.User.filter({ role: "tc" });
-        const map = {};
-        users.forEach((u) => { map[u.id] = u; });
-        setUserMap(map);
-      } catch {}
-    }
-    setLoading(false);
-  };
+  const userMap = useMemo(() => {
+    const map = {};
+    users.forEach((u) => { map[u.id] = u; });
+    return map;
+  }, [users]);
+
+  const loading = loadingProfiles;
 
   const filtered = profiles.filter((p) => {
     const user = userMap[p.user_id];
