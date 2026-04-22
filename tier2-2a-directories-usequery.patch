@@ -1,0 +1,264 @@
+From 7f4f5d3eefca5faa35c1acb2cf2cb92438dc2e35 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Wed, 22 Apr 2026 21:17:42 +0000
+Subject: [PATCH] T2.2a: Migrate 3 directory pages to useQuery
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+First slice of the T2.2 react-query fan-out. Migrates the three
+public directory pages (Investor, PML, TC) from the
+useState+useEffect+manual-fetch pattern to useQuery.
+
+Establishes the template for subsequent T2.2 sub-PRs.
+
+Pattern used in all 3 files:
+
+  const { data: profiles = [], isLoading } = useQuery({
+    queryKey: ['<Entity>Profile', { is_published: true }],
+    queryFn: () => base44.entities.<Entity>Profile.filter({ is_published: true }),
+  });
+
+  const { data: users = [] } = useQuery({
+    queryKey: ['User', { role: '<role>' }],
+    queryFn: () => base44.entities.User.filter({ role: '<role>' }),
+    enabled: profiles.length > 0,
+  });
+
+  const userMap = useMemo(() => {
+    const map = {};
+    users.forEach(u => { map[u.id] = u; });
+    return map;
+  }, [users]);
+
+Key improvements:
+- Cache hits on revisit: directory re-renders instantly, revalidates
+  in background
+- 'enabled: profiles.length > 0' preserves the original optimization
+  (don't fetch users if no profiles to enrich)
+- useMemo replaces useState+useEffect for the lookup map (no
+  synchronization bugs)
+- Empty try/catch blocks gone — queryCache handles errors centrally
+  (falls through to the T2.8 handler once that lands, or to the
+  default react-query behavior if T2.8 isn't merged yet)
+- ~30 lines of boilerplate removed per file
+
+Files (3):
+- src/pages/InvestorDirectory.jsx
+- src/pages/PMLDirectory.jsx
+- src/pages/TCDirectory.jsx
+
+Deferred to subsequent T2.2 sub-PRs (T2.2b/c/d...):
+- admin pages (Members, Applications, Partners, SupportTickets)
+- message/service-request pages
+- deal board + detail modal
+- profile pages (TC/PML/Investor Profile)
+- dashboard pages
+- public partners page
+
+Verification:
+- npm run lint: 0 errors, 0 warnings on touched files
+- npm run build: succeeds
+- Three useEffect+load functions removed; three useQuery pairs added
+---
+ src/pages/InvestorDirectory.jsx | 43 +++++++++++++++---------------
+ src/pages/PMLDirectory.jsx      | 42 ++++++++++++++++--------------
+ src/pages/TCDirectory.jsx       | 46 ++++++++++++++++-----------------
+ 3 files changed, 65 insertions(+), 66 deletions(-)
+
+diff --git a/src/pages/InvestorDirectory.jsx b/src/pages/InvestorDirectory.jsx
+index 28e880c..8e88e95 100644
+--- a/src/pages/InvestorDirectory.jsx
++++ b/src/pages/InvestorDirectory.jsx
+@@ -1,4 +1,5 @@
+-import { useState, useEffect } from "react";
++import { useState, useMemo } from "react";
++import { useQuery } from "@tanstack/react-query";
+ import { base44 } from "@/api/base44Client";
+ import InvestorCard from "../components/directory/InvestorCard";
+ import { Search } from "lucide-react";
+@@ -9,32 +10,30 @@ const DEAL_TYPES = ["Fix & Flip", "DSCR", "Wholesale", "Creative Finance", "Buy
+ const US_STATES = ["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"];
+ 
+ export default function InvestorDirectory() {
+-  const [profiles, setProfiles] = useState([]);
+-  const [userMap, setUserMap] = useState({});
+-  const [loading, setLoading] = useState(true);
+   const [search, setSearch] = useState("");
+   const [filterDealType, setFilterDealType] = useState("all");
+   const [filterState, setFilterState] = useState("all");
+ 
+-  useEffect(() => {
+-    load();
+-  }, []);
++  // Published investor profiles.
++  const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
++    queryKey: ['InvestorProfile', { is_published: true }],
++    queryFn: () => base44.entities.InvestorProfile.filter({ is_published: true }),
++  });
++
++  // Investor-role users — only fetch if there are profiles to enrich.
++  const { data: users = [] } = useQuery({
++    queryKey: ['User', { role: 'investor' }],
++    queryFn: () => base44.entities.User.filter({ role: "investor" }),
++    enabled: profiles.length > 0,
++  });
++
++  const userMap = useMemo(() => {
++    const map = {};
++    users.forEach((u) => { map[u.id] = u; });
++    return map;
++  }, [users]);
+ 
+-  const load = async () => {
+-    setLoading(true);
+-    const all = await base44.entities.InvestorProfile.filter({ is_published: true });
+-    try {
+-      // Only fetch users with the investor role instead of the full user table.
+-      // This directory only ever renders investor profiles, so any other roles
+-      // in the lookup map are wasted bytes + a PII disclosure.
+-      const users = await base44.entities.User.filter({ role: "investor" });
+-      const map = {};
+-      users.forEach((u) => { map[u.id] = u; });
+-      setUserMap(map);
+-    } catch {}
+-    setProfiles(all);
+-    setLoading(false);
+-  };
++  const loading = loadingProfiles;
+ 
+   const filtered = profiles.filter((p) => {
+     const user = userMap[p.user_id] || {};
+diff --git a/src/pages/PMLDirectory.jsx b/src/pages/PMLDirectory.jsx
+index 851b59d..65746c9 100644
+--- a/src/pages/PMLDirectory.jsx
++++ b/src/pages/PMLDirectory.jsx
+@@ -1,4 +1,5 @@
+-import { useState, useEffect } from "react";
++import { useState, useMemo } from "react";
++import { useQuery } from "@tanstack/react-query";
+ import { base44 } from "@/api/base44Client";
+ import PMLCard from "../components/directory/PMLCard";
+ import { Input } from "@/components/ui/input";
+@@ -16,31 +17,32 @@ const LTV_OPTIONS = [
+ ];
+ 
+ export default function PMLDirectory() {
+-  const [profiles, setProfiles] = useState([]);
+-  const [userMap, setUserMap] = useState({});
+-  const [loading, setLoading] = useState(true);
+   const [search, setSearch] = useState("");
+   const [loanType, setLoanType] = useState("All Types");
+   const [state, setState] = useState("All States");
+   const [minLtv, setMinLtv] = useState("any");
+ 
+-  useEffect(() => { load(); }, []);
++  // Published PML profiles.
++  const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
++    queryKey: ['PMLProfile', { is_published: true }],
++    queryFn: () => base44.entities.PMLProfile.filter({ is_published: true }),
++  });
+ 
+-  const load = async () => {
+-    setLoading(true);
+-    const pmls = await base44.entities.PMLProfile.filter({ is_published: true });
+-    setProfiles(pmls);
+-    if (pmls.length > 0) {
+-      try {
+-        // Scoped to PML-role users (directory only renders PML profiles).
+-        const users = await base44.entities.User.filter({ role: "pml" });
+-        const map = {};
+-        users.forEach((u) => { map[u.id] = u; });
+-        setUserMap(map);
+-      } catch {}
+-    }
+-    setLoading(false);
+-  };
++  // PML-role users — only fetch if there are profiles to enrich.
++  const { data: users = [] } = useQuery({
++    queryKey: ['User', { role: 'pml' }],
++    queryFn: () => base44.entities.User.filter({ role: "pml" }),
++    enabled: profiles.length > 0,
++  });
++
++  // Derive userMap from the users query — no extra state, no extra effect.
++  const userMap = useMemo(() => {
++    const map = {};
++    users.forEach((u) => { map[u.id] = u; });
++    return map;
++  }, [users]);
++
++  const loading = loadingProfiles;
+ 
+   const parseLtv = (ltvStr) => {
+     if (!ltvStr) return 0;
+diff --git a/src/pages/TCDirectory.jsx b/src/pages/TCDirectory.jsx
+index 9dcba99..161d13b 100644
+--- a/src/pages/TCDirectory.jsx
++++ b/src/pages/TCDirectory.jsx
+@@ -1,4 +1,5 @@
+-import { useState, useEffect } from "react";
++import { useState, useMemo } from "react";
++import { useQuery } from "@tanstack/react-query";
+ import { base44 } from "@/api/base44Client";
+ import TCCard from "../components/directory/TCCard";
+ import { Input } from "@/components/ui/input";
+@@ -35,35 +36,32 @@ const AVAILABILITY = [
+ ];
+ 
+ export default function TCDirectory() {
+-  const [profiles, setProfiles] = useState([]);
+-  const [userMap, setUserMap] = useState({});
+-  const [loading, setLoading] = useState(true);
+   const [search, setSearch] = useState("");
+   const [specialty, setSpecialty] = useState("All Specialties");
+   const [state, setState] = useState("All States");
+   const [minRating, setMinRating] = useState("0");
+   const [availability, setAvailability] = useState("all");
+ 
+-  useEffect(() => {
+-    load();
+-  }, []);
+-
+-  const load = async () => {
+-    setLoading(true);
+-    const tcProfiles = await base44.entities.TCProfile.filter({ is_published: true });
+-    setProfiles(tcProfiles);
+-
+-    if (tcProfiles.length > 0) {
+-      try {
+-        // Scoped to TC-role users (directory only renders TC profiles).
+-        const users = await base44.entities.User.filter({ role: "tc" });
+-        const map = {};
+-        users.forEach((u) => { map[u.id] = u; });
+-        setUserMap(map);
+-      } catch {}
+-    }
+-    setLoading(false);
+-  };
++  // Published TC profiles.
++  const { data: profiles = [], isLoading: loadingProfiles } = useQuery({
++    queryKey: ['TCProfile', { is_published: true }],
++    queryFn: () => base44.entities.TCProfile.filter({ is_published: true }),
++  });
++
++  // TC-role users — only fetch if there are profiles to enrich.
++  const { data: users = [] } = useQuery({
++    queryKey: ['User', { role: 'tc' }],
++    queryFn: () => base44.entities.User.filter({ role: "tc" }),
++    enabled: profiles.length > 0,
++  });
++
++  const userMap = useMemo(() => {
++    const map = {};
++    users.forEach((u) => { map[u.id] = u; });
++    return map;
++  }, [users]);
++
++  const loading = loadingProfiles;
+ 
+   const filtered = profiles.filter((p) => {
+     const user = userMap[p.user_id];
+-- 
+2.43.0
+
