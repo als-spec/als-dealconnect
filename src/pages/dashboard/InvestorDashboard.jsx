@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { ClipboardList, Users, FileText, DollarSign, ArrowUpRight, MessageSquare, ChevronRight } from "lucide-react";
+import { ClipboardList, Users, FileText, DollarSign, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function MetricCard({ icon: Icon, label, value, sub }) {

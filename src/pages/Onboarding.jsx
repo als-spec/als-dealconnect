@@ -4,7 +4,6 @@ import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
 import OnboardingProgress from "../components/onboarding/OnboardingProgress";
 import MemberTypeStep from "../components/onboarding/MemberTypeStep";
-import RegistrationStep from "../components/onboarding/RegistrationStep";
 import PlanSelectionStep from "../components/onboarding/PlanSelectionStep";
 import NDAStep from "../components/onboarding/NDAStep";
 import NonCompeteStep from "../components/onboarding/NonCompeteStep";

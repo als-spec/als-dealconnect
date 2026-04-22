@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle, Clock, Eye, Building2, Phone, MapPin } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Eye } from "lucide-react";
 import GradientButton from "../../components/GradientButton";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";

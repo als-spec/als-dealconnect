@@ -5,8 +5,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import GradientButton from "../GradientButton";
 import { Button } from "@/components/ui/button";
-import TagPill from "../TagPill";
-import { Plus } from "lucide-react";
 
 const ALL_SPECIALTIES = [
   "Creative Finance","Subject-To","Seller Finance","DSCR","Fix & Flip",

@@ -7,7 +7,6 @@ import GradientButton from "../components/GradientButton";
 import { Button } from "@/components/ui/button";
 import { MapPin, Building2, Pencil, MessageSquare, ClipboardList, Users, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 function StatCard({ icon: Icon, label, value }) {
   return (
