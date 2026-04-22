@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSearchParams } from "react-router-dom";
@@ -20,44 +21,39 @@ export default function TCProfilePage() {
   const profileUserId = searchParams.get("id");
 
   const { data: currentUser } = useCurrentUser();
-  const [profile, setProfile] = useState(null);
-  const [profileUser, setProfileUser] = useState(null);
-  const [reviews, setReviews] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
 
   const isOwner = !profileUserId || profileUserId === currentUser?.id;
+  const targetId = profileUserId || currentUser?.id;
 
-  const load = useCallback(async () => {
-    if (!currentUser) return;
-    setLoading(true);
-    const targetId = profileUserId || currentUser.id;
+  // TC profile for the target user.
+  const { data: profiles = [], isLoading: loadingProfile } = useQuery({
+    queryKey: ['TCProfile', { user_id: targetId }],
+    queryFn: () => base44.entities.TCProfile.filter({ user_id: targetId }),
+    enabled: !!targetId,
+  });
+  const profile = profiles[0] || null;
 
-    const profiles = await base44.entities.TCProfile.filter({ user_id: targetId });
-    if (profiles.length > 0) {
-      setProfile(profiles[0]);
-      const revs = await base44.entities.Review.filter({ tc_profile_id: profiles[0].id });
-      setReviews(revs);
-    }
+  // Reviews for this profile. Depends on profile.id so it waits.
+  const { data: reviews = [] } = useQuery({
+    queryKey: ['Review', { tc_profile_id: profile?.id }],
+    queryFn: () => base44.entities.Review.filter({ tc_profile_id: profile.id }),
+    enabled: !!profile?.id,
+  });
 
-    // For own profile use currentUser; for others (admin viewing) try User entity
-    if (!profileUserId || profileUserId === currentUser.id) {
-      setProfileUser(currentUser);
-    } else {
-      try {
-        const users = await base44.entities.User.filter({ id: targetId });
-        if (users.length > 0) setProfileUser(users[0]);
-      } catch {}
-    }
+  // profileUser: for own profile, reuse currentUser. For admin/other viewing,
+  // fetch the User entry.
+  const { data: profileUserList = [] } = useQuery({
+    queryKey: ['User', { id: targetId }],
+    queryFn: () => base44.entities.User.filter({ id: targetId }),
+    enabled: !isOwner && !!targetId && !!currentUser,
+  });
+  const profileUser = isOwner ? currentUser : (profileUserList[0] || null);
 
-    setLoading(false);
-  }, [currentUser, profileUserId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const loading = loadingProfile || !currentUser;
 
   const handleSave = async (formData) => {
     setSaving(true);
@@ -70,13 +66,14 @@ export default function TCProfilePage() {
     if (profile?.id) {
       await base44.entities.TCProfile.update(profile.id, data);
     } else {
-      const created = await base44.entities.TCProfile.create({ ...data, user_id: currentUser.id });
-      setProfile(created);
+      await base44.entities.TCProfile.create({ ...data, user_id: currentUser.id });
     }
     toast.success("Profile saved successfully");
     setSaving(false);
     setEditing(false);
-    load();
+    // Invalidate both profile and reviews — a new profile means fresh reviews.
+    queryClient.invalidateQueries({ queryKey: ['TCProfile', { user_id: targetId }] });
+    queryClient.invalidateQueries({ queryKey: ['Review'] });
   };
 
   if (loading) {
@@ -269,7 +266,7 @@ export default function TCProfilePage() {
         tcName={displayName}
         currentUser={currentUser}
         onClose={() => setShowReviewForm(false)}
-        onSubmitted={load}
+        onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['Review', { tc_profile_id: profile.id }] })}
       />
     )}
     </>

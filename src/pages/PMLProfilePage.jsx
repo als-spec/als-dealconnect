@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSearchParams } from "react-router-dom";
@@ -23,46 +24,43 @@ export default function PMLProfilePage() {
   const profileUserId = searchParams.get("id");
 
   const { data: currentUser } = useCurrentUser();
-  const [profile, setProfile] = useState(null);
-  const [profileUser, setProfileUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!currentUser) return;
-    setLoading(true);
-    const targetId = profileUserId || currentUser.id;
+  const isOwnProfile = !profileUserId || profileUserId === currentUser?.id;
+  const targetId = profileUserId || currentUser?.id;
 
-    const profiles = await base44.entities.PMLProfile.filter({ user_id: targetId });
-    if (profiles.length > 0) setProfile(profiles[0]);
+  // PML profile for the target user.
+  const { data: profiles = [], isLoading: loadingProfile } = useQuery({
+    queryKey: ['PMLProfile', { user_id: targetId }],
+    queryFn: () => base44.entities.PMLProfile.filter({ user_id: targetId }),
+    enabled: !!targetId,
+  });
+  const profile = profiles[0] || null;
 
-    if (!profileUserId || profileUserId === currentUser.id) {
-      setProfileUser(currentUser);
-    } else {
-      try {
-        const users = await base44.entities.User.filter({ id: targetId });
-        if (users.length > 0) setProfileUser(users[0]);
-      } catch {}
-    }
+  // profileUser: for own profile, reuse currentUser. For admin/other viewing,
+  // fetch the User entry. Only runs when NOT viewing own profile.
+  const { data: profileUserList = [] } = useQuery({
+    queryKey: ['User', { id: targetId }],
+    queryFn: () => base44.entities.User.filter({ id: targetId }),
+    enabled: !isOwnProfile && !!targetId && !!currentUser,
+  });
+  const profileUser = isOwnProfile ? currentUser : (profileUserList[0] || null);
 
-    setLoading(false);
-  }, [currentUser, profileUserId]);
-
-  useEffect(() => { load(); }, [load]);
+  const loading = loadingProfile || !currentUser;
 
   const handleSave = async (formData) => {
     setSaving(true);
     if (profile?.id) {
       await base44.entities.PMLProfile.update(profile.id, formData);
     } else {
-      const created = await base44.entities.PMLProfile.create({ ...formData, user_id: currentUser.id });
-      setProfile(created);
+      await base44.entities.PMLProfile.create({ ...formData, user_id: currentUser.id });
     }
     toast.success("Profile saved successfully");
     setSaving(false);
     setEditing(false);
-    load();
+    queryClient.invalidateQueries({ queryKey: ['PMLProfile', { user_id: targetId }] });
   };
 
   if (loading) {
