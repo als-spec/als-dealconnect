@@ -24,7 +24,10 @@ export default function InvestorDirectory() {
     setLoading(true);
     const all = await base44.entities.InvestorProfile.filter({ is_published: true });
     try {
-      const users = await base44.entities.User.list();
+      // Only fetch users with the investor role instead of the full user table.
+      // This directory only ever renders investor profiles, so any other roles
+      // in the lookup map are wasted bytes + a PII disclosure.
+      const users = await base44.entities.User.filter({ role: "investor" });
       const map = {};
       users.forEach((u) => { map[u.id] = u; });
       setUserMap(map);

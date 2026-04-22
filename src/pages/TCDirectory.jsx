@@ -55,7 +55,8 @@ export default function TCDirectory() {
 
     if (tcProfiles.length > 0) {
       try {
-        const users = await base44.entities.User.list();
+        // Scoped to TC-role users (directory only renders TC profiles).
+        const users = await base44.entities.User.filter({ role: "tc" });
         const map = {};
         users.forEach((u) => { map[u.id] = u; });
         setUserMap(map);

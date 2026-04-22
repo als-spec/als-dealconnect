@@ -39,16 +39,18 @@ export default function Applications() {
   }, []);
 
   const loadApplications = async () => {
-    const [apps, users] = await Promise.all([
+    const [apps, pendingUsersRaw] = await Promise.all([
       base44.entities.MemberApplication.list("-created_date"),
-      base44.entities.User.list(),
+      // Scope server-side to pending members instead of pulling the full user
+      // table. Per Onboarding.jsx, `member_status: "pending"` is set together
+      // with `onboarding_step: "pending_approval"` — so this filter catches
+      // both conditions the client previously OR'd together.
+      base44.entities.User.filter({ member_status: "pending" }),
     ]);
 
-    // Add synthetic entries for users pending approval who have no MemberApplication
+    // Add synthetic entries for pending users who have no MemberApplication.
     const appUserIds = new Set(apps.map(a => a.user_id).filter(Boolean));
-    const pendingUsers = users.filter(
-      u => (u.onboarding_step === "pending_approval" || u.member_status === "pending") && !appUserIds.has(u.id)
-    );
+    const pendingUsers = pendingUsersRaw.filter(u => !appUserIds.has(u.id));
     const syntheticApps = pendingUsers.map(u => ({
       id: "user_" + u.id,
       user_id: u.id,

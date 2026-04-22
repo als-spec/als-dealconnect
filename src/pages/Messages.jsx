@@ -32,7 +32,12 @@ export default function Messages() {
     if (!user) return;
     (async () => {
       try {
-        const users = await base44.entities.User.list();
+        // Scope the picker to approved members only. Previously this pulled
+        // every user in the system and filtered client-side, which both leaked
+        // PII (pending/rejected users' emails and names) and showed users
+        // that shouldn't be message-able. Server-side filter is smaller +
+        // correct.
+        const users = await base44.entities.User.filter({ member_status: "approved" });
         setAllUsers(users.filter(usr => usr.id !== user.id));
       } catch {}
       await loadThreads(user);
