@@ -5,8 +5,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-d
 import PageNotFound from "./lib/PageNotFound";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
-import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 import Layout from "./components/Layout";
 import Onboarding from "./pages/Onboarding";
@@ -31,22 +30,13 @@ import AdminSupportTickets from "./pages/admin/SupportTickets";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
-  const [user, setUser] = useState(null);
-  const [loadingUser, setLoadingUser] = useState(true);
 
-  useEffect(() => {
-    if (!isLoadingAuth && !isLoadingPublicSettings) {
-      if (authError) {
-        setLoadingUser(false);
-      } else {
-        let cancelled = false;
-        base44.auth.me()
-          .then((u) => { if (!cancelled) { setUser(u); setLoadingUser(false); } })
-          .catch(() => { if (!cancelled) setLoadingUser(false); });
-        return () => { cancelled = true; };
-      }
-    }
-  }, [isLoadingAuth, isLoadingPublicSettings, authError]);
+  // Only fetch the user once the auth preflight is done and there's no authError.
+  // react-query dedupes this across the app — every other page/useCurrentUser()
+  // call will hit the same cache entry.
+  const { data: user, isLoading: loadingUser } = useCurrentUser({
+    enabled: !isLoadingAuth && !isLoadingPublicSettings && !authError,
+  });
 
   if (isLoadingPublicSettings || isLoadingAuth || loadingUser) {
     return (

@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSearchParams } from "react-router-dom";
 import PMLLendingCriteria from "../components/profile/PMLLendingCriteria";
 import PMLProfileEditForm from "../components/profile/PMLProfileEditForm";
@@ -21,26 +22,23 @@ export default function PMLProfilePage() {
   const [searchParams] = useSearchParams();
   const profileUserId = searchParams.get("id");
 
-  const [currentUser, setCurrentUser] = useState(null);
+  const { data: currentUser } = useCurrentUser();
   const [profile, setProfile] = useState(null);
   const [profileUser, setProfileUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { load(); }, [profileUserId]);
-
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (!currentUser) return;
     setLoading(true);
-    const me = await base44.auth.me();
-    setCurrentUser(me);
-    const targetId = profileUserId || me.id;
+    const targetId = profileUserId || currentUser.id;
 
     const profiles = await base44.entities.PMLProfile.filter({ user_id: targetId });
     if (profiles.length > 0) setProfile(profiles[0]);
 
-    if (!profileUserId || profileUserId === me.id) {
-      setProfileUser(me);
+    if (!profileUserId || profileUserId === currentUser.id) {
+      setProfileUser(currentUser);
     } else {
       try {
         const users = await base44.entities.User.filter({ id: targetId });
@@ -49,7 +47,9 @@ export default function PMLProfilePage() {
     }
 
     setLoading(false);
-  };
+  }, [currentUser, profileUserId]);
+
+  useEffect(() => { load(); }, [load]);
 
   const handleSave = async (formData) => {
     setSaving(true);

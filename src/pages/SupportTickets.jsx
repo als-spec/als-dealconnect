@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Plus, LifeBuoy, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -20,7 +21,7 @@ const PRIORITY_STYLES = {
 };
 
 export default function SupportTickets() {
-  const [user, setUser] = useState(null);
+  const { data: user } = useCurrentUser();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -30,17 +31,16 @@ export default function SupportTickets() {
   const [commentingId, setCommentingId] = useState(null);
   const [form, setForm] = useState({ subject: "", description: "", priority: "medium" });
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const load = async () => {
-    const u = await base44.auth.me();
-    setUser(u);
-    const all = await base44.entities.SupportTicket.filter({ reported_by_user_id: u.id }, "-created_date");
+  const load = useCallback(async () => {
+    if (!user) return;
+    const all = await base44.entities.SupportTicket.filter({ reported_by_user_id: user.id }, "-created_date");
     setTickets(all);
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleSubmit = async () => {
     if (!form.subject.trim() || !form.description.trim()) {

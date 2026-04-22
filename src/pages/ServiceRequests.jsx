@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   Plus, X, FileText, Upload, CheckCircle2, Clock, Loader2, Award, ChevronLeft, Send
 } from "lucide-react";
@@ -70,7 +71,7 @@ function ProgressStepper({ status }) {
 }
 
 export default function ServiceRequests() {
-  const [user, setUser] = useState(null);
+  const { data: user } = useCurrentUser();
   const [requests, setRequests] = useState([]);
   const [selected, setSelected] = useState(null);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
@@ -85,17 +86,16 @@ export default function ServiceRequests() {
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Load dependents once the user resolves.
   useEffect(() => {
-    init();
-  }, []);
-
-  const init = async () => {
-    const u = await base44.auth.me();
-    setUser(u);
-    const users = await base44.entities.User.list();
-    setAllUsers(users.filter(usr => usr.id !== u.id));
-    await loadRequests(u);
-  };
+    if (!user) return;
+    (async () => {
+      const users = await base44.entities.User.list();
+      setAllUsers(users.filter(usr => usr.id !== user.id));
+      await loadRequests(user);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const loadRequests = async (u) => {
     const u_ = u || user;

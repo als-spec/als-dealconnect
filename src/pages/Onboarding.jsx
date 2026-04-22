@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { useRefetchCurrentUser, useInvalidateCurrentUser } from "@/hooks/useCurrentUser";
 import Logo from "../components/Logo";
 import OnboardingProgress from "../components/onboarding/OnboardingProgress";
 import MemberTypeStep from "../components/onboarding/MemberTypeStep";
@@ -14,6 +15,8 @@ import PendingApprovalStep from "../components/onboarding/PendingApprovalStep";
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const refetchUser = useRefetchCurrentUser();
+  const invalidateUser = useInvalidateCurrentUser();
   const [step, setStep] = useState("member_type");
   const [loading, setLoading] = useState(true);
   const [paymentError, setPaymentError] = useState("");
@@ -24,6 +27,7 @@ export default function Onboarding() {
 
   useEffect(() => {
     loadUserState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadUserState = async () => {
@@ -37,7 +41,7 @@ export default function Onboarding() {
 
     let user = null;
     try {
-      user = await base44.auth.me();
+      user = await refetchUser();
     } catch (e) {
       setLoading(false);
       return;
@@ -63,6 +67,7 @@ export default function Onboarding() {
         try {
           const res = await base44.functions.invoke("verifyCheckoutSession", { sessionId });
           if (res.data?.success) {
+            await invalidateUser(); // server updated onboarding_step server-side
             setStep("nda");
             setLoading(false);
             return;
@@ -101,6 +106,7 @@ export default function Onboarding() {
       member_type: formData.member_type,
       onboarding_step: "plan_selection",
     });
+    await invalidateUser();
     setStep("plan_selection");
   };
 
@@ -109,22 +115,24 @@ export default function Onboarding() {
       selected_plan: formData.selected_plan,
       onboarding_step: "checkout",
     });
+    await invalidateUser();
     setStep("checkout");
   };
 
   const handleNDAAccept = async () => {
-    const user = await base44.auth.me();
+    const user = await refetchUser();
     await base44.auth.updateMe({
       onboarding_step: "non_compete",
       nda_accepted: true,
       nda_accepted_date: new Date().toISOString(),
       nda_signer_name: user.full_name,
     });
+    await invalidateUser();
     setStep("non_compete");
   };
 
   const handleNonCompeteAccept = async () => {
-    const user = await base44.auth.me();
+    const user = await refetchUser();
     const now = new Date().toISOString();
     await base44.auth.updateMe({
       onboarding_step: "pending_approval",
@@ -133,7 +141,7 @@ export default function Onboarding() {
       non_compete_accepted_date: now,
       non_compete_signer_name: user.full_name,
     });
-    const freshUser = await base44.auth.me();
+    const freshUser = await refetchUser();
     await base44.entities.MemberApplication.create({
       email: freshUser.email,
       full_name: freshUser.full_name,
@@ -153,11 +161,13 @@ export default function Onboarding() {
 
   const handleNDADecline = async () => {
     await base44.auth.updateMe({ onboarding_step: "member_type" });
+    await invalidateUser();
     setStep("member_type");
   };
 
   const handleNonCompeteDecline = async () => {
     await base44.auth.updateMe({ onboarding_step: "nda" });
+    await invalidateUser();
     setStep("nda");
   };
 
