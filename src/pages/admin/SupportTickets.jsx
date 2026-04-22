@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { LifeBuoy, Loader2, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -20,7 +21,7 @@ const PRIORITY_STYLES = {
 };
 
 export default function AdminSupportTickets() {
-  const [user, setUser] = useState(null);
+  const { data: user } = useCurrentUser();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -28,17 +29,15 @@ export default function AdminSupportTickets() {
   const [commentingId, setCommentingId] = useState(null);
   const [filter, setFilter] = useState("all");
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const load = async () => {
-    const u = await base44.auth.me();
-    setUser(u);
+  const load = useCallback(async () => {
     const all = await base44.entities.SupportTicket.list("-created_date");
     setTickets(all);
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const updateStatus = async (ticket, status) => {
     await base44.entities.SupportTicket.update(ticket.id, { status });

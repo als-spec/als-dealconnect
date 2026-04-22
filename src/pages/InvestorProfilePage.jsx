@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import InvestorProfileEditForm from "../components/profile/InvestorProfileEditForm";
 import TagPill from "../components/TagPill";
@@ -23,7 +24,7 @@ export default function InvestorProfilePage() {
   const navigate = useNavigate();
   const profileUserId = searchParams.get("id");
 
-  const [currentUser, setCurrentUser] = useState(null);
+  const { data: currentUser } = useCurrentUser();
   const [profile, setProfile] = useState(null);
   const [profileUser, setProfileUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -32,23 +33,22 @@ export default function InvestorProfilePage() {
 
   const isOwner = !profileUserId || profileUserId === currentUser?.id;
 
-  useEffect(() => { load(); }, [profileUserId]);
-
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (!currentUser) return;
     setLoading(true);
-    const me = await base44.auth.me();
-    setCurrentUser(me);
-    const targetId = profileUserId || me.id;
+    const targetId = profileUserId || currentUser.id;
 
     const profiles = await base44.entities.InvestorProfile.filter({ user_id: targetId });
     if (profiles.length > 0) setProfile(profiles[0]);
 
-    if (!profileUserId || profileUserId === me.id) {
-      setProfileUser(me);
+    if (!profileUserId || profileUserId === currentUser.id) {
+      setProfileUser(currentUser);
     }
 
     setLoading(false);
-  };
+  }, [currentUser, profileUserId]);
+
+  useEffect(() => { load(); }, [load]);
 
   const handleSave = async (formData) => {
     setSaving(true);

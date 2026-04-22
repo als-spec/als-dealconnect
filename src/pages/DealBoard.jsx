@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import DealCard from "@/components/deals/DealCard";
 import DealFilters from "@/components/deals/DealFilters";
 import DealDetailModal from "@/components/deals/DealDetailModal";
@@ -12,7 +13,7 @@ import { Plus, Briefcase, Layers } from "lucide-react";
 const EMPTY_FILTERS = { search: "", property_type: "all", deal_type: "all", state: "all", status: "all" };
 
 export default function DealBoard() {
-  const [user, setUser] = useState(null);
+  const { data: user } = useCurrentUser();
   const [deals, setDeals] = useState([]);
   const [applications, setApplications] = useState([]);
   const [tcProfiles, setTcProfiles] = useState({});
@@ -24,14 +25,13 @@ export default function DealBoard() {
   const [activeTab, setActiveTab] = useState("board"); // board | matches (investor only)
 
   const loadData = useCallback(async () => {
-    const u = await base44.auth.me();
-    setUser(u);
+    if (!user) return;
 
     const allDeals = await base44.entities.Deal.list("-created_date", 100);
     setDeals(allDeals);
 
-    if (u.role === "investor") {
-      const myDeals = allDeals.filter(d => d.investor_id === u.id);
+    if (user.role === "investor") {
+      const myDeals = allDeals.filter(d => d.investor_id === user.id);
       const dealIds = myDeals.map(d => d.id);
       if (dealIds.length > 0) {
         const apps = await base44.entities.DealApplication.list("-created_date", 200);
@@ -49,14 +49,14 @@ export default function DealBoard() {
       }
     }
 
-    if (u.role === "tc") {
+    if (user.role === "tc") {
       // Load own TC profile for match display
-      const profiles = await base44.entities.TCProfile.filter({ user_id: u.id });
-      if (profiles[0]) setTcProfiles({ [u.id]: profiles[0] });
+      const profiles = await base44.entities.TCProfile.filter({ user_id: user.id });
+      if (profiles[0]) setTcProfiles({ [user.id]: profiles[0] });
     }
 
     setLoading(false);
-  }, []);
+  }, [user]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

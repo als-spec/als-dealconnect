@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Send, Paperclip, Plus, X, FileText, MessageSquare, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 
 export default function Messages() {
-  const [user, setUser] = useState(null);
+  const { data: user } = useCurrentUser();
   const [threads, setThreads] = useState([]);
   const [selectedThread, setSelectedThread] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -25,26 +26,22 @@ export default function Messages() {
   const [showMobileConvo, setShowMobileConvo] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const currentUser = useRef(null);
 
+  // Initial data load — wait for user to resolve, then fetch dependents.
   useEffect(() => {
-    init();
-  }, []);
-
-  const init = async () => {
-    const u = await base44.auth.me();
-    setUser(u);
-    currentUser.current = u;
-    try {
-      const users = await base44.entities.User.list();
-      setAllUsers(users.filter(usr => usr.id !== u.id));
-    } catch {}
-    
-    await loadThreads(u);
-  };
+    if (!user) return;
+    (async () => {
+      try {
+        const users = await base44.entities.User.list();
+        setAllUsers(users.filter(usr => usr.id !== user.id));
+      } catch {}
+      await loadThreads(user);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const loadThreads = async (u) => {
-    const u_ = u || currentUser.current;
+    const u_ = u || user;
     if (!u_) return;
     const all = await base44.entities.MessageThread.list('-last_message_at', 200);
     setThreads(all.filter(t => t.participants?.includes(u_.id)));

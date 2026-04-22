@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSearchParams } from "react-router-dom";
 import ReviewForm from "../components/reviews/ReviewForm";
 import TCStatBar from "../components/profile/TCStatBar";
@@ -18,7 +19,7 @@ export default function TCProfilePage() {
   const [searchParams] = useSearchParams();
   const profileUserId = searchParams.get("id");
 
-  const [currentUser, setCurrentUser] = useState(null);
+  const { data: currentUser } = useCurrentUser();
   const [profile, setProfile] = useState(null);
   const [profileUser, setProfileUser] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -29,15 +30,10 @@ export default function TCProfilePage() {
 
   const isOwner = !profileUserId || profileUserId === currentUser?.id;
 
-  useEffect(() => {
-    load();
-  }, [profileUserId]);
-
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (!currentUser) return;
     setLoading(true);
-    const me = await base44.auth.me();
-    setCurrentUser(me);
-    const targetId = profileUserId || me.id;
+    const targetId = profileUserId || currentUser.id;
 
     const profiles = await base44.entities.TCProfile.filter({ user_id: targetId });
     if (profiles.length > 0) {
@@ -46,9 +42,9 @@ export default function TCProfilePage() {
       setReviews(revs);
     }
 
-    // For own profile use me; for others (admin viewing) try User entity
-    if (!profileUserId || profileUserId === me.id) {
-      setProfileUser(me);
+    // For own profile use currentUser; for others (admin viewing) try User entity
+    if (!profileUserId || profileUserId === currentUser.id) {
+      setProfileUser(currentUser);
     } else {
       try {
         const users = await base44.entities.User.filter({ id: targetId });
@@ -57,7 +53,11 @@ export default function TCProfilePage() {
     }
 
     setLoading(false);
-  };
+  }, [currentUser, profileUserId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleSave = async (formData) => {
     setSaving(true);
