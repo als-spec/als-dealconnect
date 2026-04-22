@@ -25,8 +25,9 @@ const EMPTY_FORM = {
   contact_phone: "",
 };
 
-export default function PartnersPage() {
+export default function PartnersPage({ user }) {
   const navigate = useNavigate();
+  const authedUser = user ?? null;
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
@@ -35,10 +36,8 @@ export default function PartnersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
-  const [authedUser, setAuthedUser] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(u => { if (u) setAuthedUser(u); }).catch(() => {});
     base44.entities.Partner.filter({ is_active: true }).then((data) => {
       setPartners(data);
       setLoading(false);
