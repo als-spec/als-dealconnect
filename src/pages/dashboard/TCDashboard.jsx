@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { ClipboardList, CheckCircle2, Star, Eye, ArrowUpRight, MessageSquare, Award, Clock } from "lucide-react";
+import { ClipboardList, CheckCircle2, Star, Eye, ArrowUpRight, MessageSquare, Award } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { cn } from "@/lib/utils";
 import StarRating from "../../components/StarRating";

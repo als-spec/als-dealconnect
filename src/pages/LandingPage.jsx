@@ -1,12 +1,19 @@
 import { Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
-import { ShieldCheck, TrendingUp, Award, DollarSign, ArrowRight } from "lucide-react";
+import { ShieldCheck, TrendingUp, Award, DollarSign, ArrowRight, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 const MEMBER_CARDS = [
   {
     role: "Transaction Coordinator",
     type: "tc",
+    ctaLabel: "Join as TC",
     icon: "📋",
     color: "from-teal to-cyan",
     tags: ["Creative Finance", "Fix & Flip", "DSCR", "Subject-To"],
@@ -15,6 +22,7 @@ const MEMBER_CARDS = [
   {
     role: "Investor / Agent",
     type: "investor",
+    ctaLabel: "Join as Investor",
     icon: "🏗️",
     color: "from-cyan to-blue-400",
     tags: ["Deal Flow", "TC Matching", "Private Lending", "Closings"],
@@ -23,6 +31,7 @@ const MEMBER_CARDS = [
   {
     role: "Private Money Lender",
     type: "pml",
+    ctaLabel: "Join as Lender",
     icon: "💼",
     color: "from-teal to-green-400",
     tags: ["Bridge Loans", "Fix & Flip", "DSCR", "Ground-Up"],
@@ -113,12 +122,42 @@ export default function LandingPage({ user }) {
                 >
                   I'm a TC <ArrowRight className="w-4 h-4" />
                 </Link>
-                <Link
-                  to="/onboarding?type=investor"
-                  className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
-                >
-                  I'm an Investor or Lender <ArrowRight className="w-4 h-4" />
-                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
+                    >
+                      I'm an Investor or Lender <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center" className="w-64">
+                    <DropdownMenuItem
+                      onSelect={() => navigate("/onboarding?type=investor")}
+                      className="py-3 cursor-pointer"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl">🏗️</span>
+                        <div>
+                          <p className="font-bold text-navy text-sm">Investor / Agent</p>
+                          <p className="text-xs text-muted-foreground">Post deals, find TCs</p>
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => navigate("/onboarding?type=pml")}
+                      className="py-3 cursor-pointer"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl">💼</span>
+                        <div>
+                          <p className="font-bold text-navy text-sm">Private Money Lender</p>
+                          <p className="text-xs text-muted-foreground">Fund deals, grow portfolio</p>
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
           </div>
@@ -167,7 +206,7 @@ export default function LandingPage({ user }) {
                       to={`/onboarding?type=${card.type}`}
                       className="gradient-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition-all inline-flex items-center gap-2 w-full justify-center"
                     >
-                      Join as {card.role.split(" ")[0]} <ArrowRight className="w-3.5 h-3.5" />
+                      {card.ctaLabel} <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   )}
                 </div>

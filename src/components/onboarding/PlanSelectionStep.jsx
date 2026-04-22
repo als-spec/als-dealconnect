@@ -49,7 +49,24 @@ const PLANS = {
 export default function PlanSelectionStep({ memberType, onBack, paymentError }) {
   const [loading, setLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
-  const plan = PLANS[memberType] || PLANS.investor;
+  const plan = PLANS[memberType];
+
+  // Guard: if member_type isn't set (URL tamper, stale state, or a bug in the
+  // previous step's save), do NOT silently default to Investor — that risks
+  // billing and routing users to the wrong role. Send them back to pick a type.
+  if (!plan) {
+    return (
+      <div className="space-y-6 text-center">
+        <h2 className="text-2xl font-bold text-navy">We couldn't load your plan</h2>
+        <p className="text-slate-text max-w-md mx-auto">
+          It looks like your member type wasn't saved. Please go back and select your role so we can show you the right plan.
+        </p>
+        <Button onClick={onBack} className="gradient-primary text-white">
+          Back to Member Type
+        </Button>
+      </div>
+    );
+  }
 
   const handleCheckout = async () => {
     setLoading(true);

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 const STAGES = [
   { key: "requested", label: "Requested", icon: Clock },
@@ -124,7 +125,7 @@ export default function ServiceRequests() {
       setSelected(updated);
       await loadRequests();
     } catch (e) {
-      alert("Failed to update status. Please try again.");
+      toast.error("Failed to update status. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -156,12 +157,12 @@ export default function ServiceRequests() {
     if (!file || !selected) return;
 
     if (file.size > MAX_FILE_SIZE) {
-      alert("File is too large. Maximum size is 25 MB.");
+      toast.error("File is too large. Maximum size is 25 MB.");
       e.target.value = '';
       return;
     }
     if (!ALLOWED_TYPES.includes(file.type)) {
-      alert("File type not allowed. Please upload a PDF, image, Word, or Excel file.");
+      toast.error("File type not allowed. Please upload a PDF, image, Word, or Excel file.");
       e.target.value = '';
       return;
     }
@@ -181,7 +182,7 @@ export default function ServiceRequests() {
       setSelected(updated);
       await loadRequests();
     } catch (e) {
-      alert("Upload failed. Please try again.");
+      toast.error("Upload failed. Please try again.");
     } finally {
       setUploading(false);
       e.target.value = '';

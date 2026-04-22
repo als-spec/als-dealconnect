@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Users, ClipboardList, MessageSquare, CheckCircle2, XCircle, Eye, Building2, MapPin, BarChart3 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Users, ClipboardList, MessageSquare, CheckCircle2, XCircle, Building2, MapPin, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import GradientButton from "../../components/GradientButton";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
