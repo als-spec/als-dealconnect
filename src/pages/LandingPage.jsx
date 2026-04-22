@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
 import { ShieldCheck, TrendingUp, Award, DollarSign, ArrowRight } from "lucide-react";
@@ -38,6 +39,13 @@ const TRUST_ITEMS = [
 ];
 
 export default function LandingPage() {
+  const navigate = useNavigate();
+  const [authedUser, setAuthedUser] = useState(null);
+
+  useEffect(() => {
+    base44.auth.me().then(u => { if (u) setAuthedUser(u); }).catch(() => {});
+  }, []);
+
   return (
     <div className="min-h-screen font-barlow" style={{ backgroundColor: "#e8f0f7" }}>
       {/* Nav */}
@@ -48,18 +56,29 @@ export default function LandingPage() {
             <Link to="/partners" className="text-sm font-semibold text-slate-text hover:text-teal transition-colors">
               Partners
             </Link>
-            <button
-              onClick={() => base44.auth.redirectToLogin(window.location.origin + '/dashboard')}
-              className="text-sm font-semibold text-navy border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors"
-            >
-              Sign In
-            </button>
-            <Link
-              to="/onboarding"
-              className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
-            >
-              Join Now
-            </Link>
+            {authedUser ? (
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
+              >
+                Go to Dashboard
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => base44.auth.redirectToLogin(window.location.href)}
+                  className="text-sm font-semibold text-navy border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors"
+                >
+                  Sign In
+                </button>
+                <Link
+                  to="/onboarding"
+                  className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
+                >
+                  Join Now
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
