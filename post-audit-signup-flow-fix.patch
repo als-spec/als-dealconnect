@@ -1,0 +1,132 @@
+From 84564b27626a04e7b85d74455be34754a725df8a Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Thu, 23 Apr 2026 19:47:25 +0000
+Subject: [PATCH] Signup flow fix: /onboarding public + dropdown emoji cleanup
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Two small fixes surfaced while smoke-testing icon modernization on
+the live URL.
+
+Fix 1: add /onboarding to publicPaths (App.jsx)
+
+  When the Base44 app is configured as 'Public (login required)',
+  unauthenticated visitors can view the landing page but any click
+  that navigates them elsewhere triggers App.jsx's auth_required
+  branch, which calls navigateToLogin() and redirects to Base44
+  login.
+
+  The landing-page signup CTAs ('I'm a TC', 'Join as TC', the
+  'I'm an Investor or Lender' dropdown items) all link to
+  /onboarding?type=<role>. Since /onboarding was NOT in publicPaths,
+  the flow was:
+
+    1. Unauthenticated visitor clicks 'I'm a TC'
+    2. Browser navigates to /onboarding?type=tc
+    3. App.jsx auth check: /onboarding not in publicPaths
+    4. navigateToLogin() → Base44 login page
+    5. Visitor has no account → dead-end
+
+  This is a chicken-and-egg problem: requiring login before signup.
+  Adding /onboarding to publicPaths lets unauthenticated visitors
+  reach the signup form. Onboarding.jsx already handles null user
+  gracefully (refetchUser wrapped in try/catch, bails to the initial
+  member_type step if no user). Base44 account creation happens
+  inside the flow (before Stripe checkout, since the subscription
+  needs an account to attach to).
+
+  Confirmed this was a pre-existing bug — the signup flow had been
+  dead-ending for unauthenticated visitors since the publicPaths
+  constant was introduced. Never noticed because testing was done
+  from the logged-in Base44 editor.
+
+Fix 2: replace 2 missed emoji in the hero dropdown (LandingPage.jsx)
+
+  The initial icon modernization PR replaced emoji in the MEMBER_CARDS
+  ('Who We Serve' section) but missed the two emoji inside the
+  'I'm an Investor or Lender' dropdown menu items (🏗️ and 💼).
+
+  Now using the same Building2 (Investor) and Landmark (PML) icons
+  that the top-level cards use, wrapped in 32x32 teal-tinted tiles
+  to match the smaller dropdown item context. Reuses imports already
+  pulled in from icon modernization — no new dependencies.
+
+Files (2):
+  - src/App.jsx (+15/-1)
+  - src/pages/LandingPage.jsx (+6/-2)
+
+Verification:
+  - npm run lint: 0 errors
+  - npm run build: succeeds
+  - No new dependencies
+
+Depends on: icon-modernization PR (Building2 and Landmark imports).
+---
+ src/App.jsx               | 16 +++++++++++++++-
+ src/pages/LandingPage.jsx |  8 ++++++--
+ 2 files changed, 21 insertions(+), 3 deletions(-)
+
+diff --git a/src/App.jsx b/src/App.jsx
+index 2c2ba38..6dc6a3c 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -35,7 +35,20 @@ const AuthenticatedApp = () => {
+     );
+   }
+ 
+-  const publicPaths = ["/", "/partners"];
++  // Paths accessible to unauthenticated visitors when the app's auth
++  // preflight returns auth_required. The landing page, partners page,
++  // and the onboarding form are the entry points for new users — they
++  // must be reachable without a Base44 account. The user will sign
++  // up / create their Base44 account as part of the onboarding flow
++  // itself (before Stripe checkout, which needs an account to attach
++  // the subscription to).
++  //
++  // /onboarding was previously NOT in this list, which meant clicking
++  // 'I'm a TC' / 'Join as TC' on the landing page redirected
++  // unauthenticated visitors to Base44 login — a dead-end for people
++  // who don't yet have accounts. Added so the signup flow actually
++  // works for new users.
++  const publicPaths = ["/", "/partners", "/onboarding"];
+   const currentPath = window.location.pathname;
+ 
+   if (authError) {
+@@ -47,6 +60,7 @@ const AuthenticatedApp = () => {
+           <Routes>
+             <Route path="/" element={<LandingPage user={null} />} />
+             <Route path="/partners" element={<PartnersPage user={null} />} />
++            <Route path="/onboarding" element={<Onboarding />} />
+             <Route path="*" element={<Navigate to="/" replace />} />
+           </Routes>
+         );
+diff --git a/src/pages/LandingPage.jsx b/src/pages/LandingPage.jsx
+index 79a3d41..75b2a07 100644
+--- a/src/pages/LandingPage.jsx
++++ b/src/pages/LandingPage.jsx
+@@ -145,7 +145,9 @@ export default function LandingPage({ user }) {
+                       className="py-3 cursor-pointer"
+                     >
+                       <div className="flex items-start gap-3">
+-                        <span className="text-xl">🏗️</span>
++                        <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center flex-shrink-0">
++                          <Icon as={Building2} className="w-4 h-4 text-navy" />
++                        </div>
+                         <div>
+                           <p className="font-bold text-navy text-sm">Investor / Agent</p>
+                           <p className="text-xs text-muted-foreground">Post deals, find TCs</p>
+@@ -157,7 +159,9 @@ export default function LandingPage({ user }) {
+                       className="py-3 cursor-pointer"
+                     >
+                       <div className="flex items-start gap-3">
+-                        <span className="text-xl">💼</span>
++                        <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center flex-shrink-0">
++                          <Icon as={Landmark} className="w-4 h-4 text-navy" />
++                        </div>
+                         <div>
+                           <p className="font-bold text-navy text-sm">Private Money Lender</p>
+                           <p className="text-xs text-muted-foreground">Fund deals, grow portfolio</p>
+-- 
+2.43.0
+
