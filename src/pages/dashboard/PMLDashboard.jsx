@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { DollarSign, ClipboardList, BarChart3, Clock, ArrowUpRight } from "lucide-react";
@@ -24,24 +25,27 @@ const performanceData = [
 ];
 
 export default function PMLDashboard({ user }) {
-  const [threads, setThreads] = useState([]);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Message threads — filtered client-side by participant, same as before.
+  const { data: allThreads = [], isLoading: loadingThreads } = useQuery({
+    queryKey: ['MessageThread', 'list', { sort: '-last_message_at', limit: 100 }],
+    queryFn: () => base44.entities.MessageThread.list('-last_message_at', 100),
+    enabled: !!user?.id,
+  });
 
-  useEffect(() => {
-    if (!user?.id) return;
-    load();
-  }, [user?.id]);
+  const threads = useMemo(
+    () => (user?.id ? allThreads.filter(t => t.participants?.includes(user.id)) : []),
+    [allThreads, user?.id]
+  );
 
-  const load = async () => {
-    const [threads_, profiles] = await Promise.all([
-      base44.entities.MessageThread.list('-last_message_at', 100),
-      base44.entities.PMLProfile.filter({ user_id: user.id }),
-    ]);
-    setThreads(threads_.filter(t => t.participants?.includes(user.id)));
-    if (profiles.length > 0) setProfile(profiles[0]);
-    setLoading(false);
-  };
+  // This user's PML profile.
+  const { data: profiles = [], isLoading: loadingProfile } = useQuery({
+    queryKey: ['PMLProfile', { user_id: user?.id }],
+    queryFn: () => base44.entities.PMLProfile.filter({ user_id: user.id }),
+    enabled: !!user?.id,
+  });
+  const profile = profiles[0] || null;
+
+  const loading = loadingThreads || loadingProfile;
 
   const activeInquiries = threads.filter(t => t.unread_by?.includes(user.id)).length;
   const totalInquiries = threads.length;
