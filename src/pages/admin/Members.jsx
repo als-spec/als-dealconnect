@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Search, Users, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import Icon from "@/components/Icon";
+import DotBadge from "@/components/DotBadge";
+import { ROLE_DOT_COLORS, STATUS_DOT_COLORS } from "@/lib/roleStyles";
 import GradientButton from "../../components/GradientButton";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -19,20 +21,6 @@ const ROLE_LABELS = {
   investor: "Investor / Agent",
   pml: "Private Money Lender",
   pending: "Pending",
-};
-
-const ROLE_COLORS = {
-  admin: "bg-purple-50 text-purple-700 border-purple-200",
-  tc: "bg-blue-50 text-blue-700 border-blue-200",
-  investor: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  pml: "bg-amber-50 text-amber-700 border-amber-200",
-  pending: "bg-gray-50 text-gray-700 border-gray-200",
-};
-
-const STATUS_COLORS = {
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
 };
 
 const PLAN_LABELS = {
@@ -178,7 +166,7 @@ export default function Members() {
 
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Icon as={Search} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search by name, email, or company..."
             value={search}
@@ -227,14 +215,14 @@ export default function Members() {
                     </div>
                   </td>
                   <td className="px-5 py-4">
-                    <Badge variant="outline" className={cn("text-xs", ROLE_COLORS[m.role || "pending"])}>
+                    <DotBadge color={ROLE_DOT_COLORS[m.role || "pending"]}>
                       {ROLE_LABELS[m.role || "pending"]}
-                    </Badge>
+                    </DotBadge>
                   </td>
                   <td className="px-5 py-4">
-                    <Badge variant="outline" className={cn("text-xs capitalize", STATUS_COLORS[m.member_status || "pending"])}>
+                    <DotBadge color={STATUS_DOT_COLORS[m.member_status || "pending"]} className="capitalize">
                       {m.member_status || "Pending"}
-                    </Badge>
+                    </DotBadge>
                   </td>
                   <td className="px-5 py-4 hidden md:table-cell text-sm text-muted-foreground">
                     {m.stripe_price_id ? PLAN_LABELS[m.stripe_price_id] || m.stripe_price_id : m.selected_plan || "—"}
@@ -244,7 +232,7 @@ export default function Members() {
                   </td>
                   <td className="px-5 py-4">
                     <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => openEdit(m)}>
-                      <Pencil className="w-3.5 h-3.5" /> Edit
+                      <Icon as={Pencil} className="w-3.5 h-3.5" /> Edit
                     </Button>
                   </td>
                 </tr>
@@ -252,7 +240,7 @@ export default function Members() {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-5 py-12 text-center">
-                    <Users className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                    <Icon as={Users} className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                     <p className="text-muted-foreground">No members found</p>
                   </td>
                 </tr>
@@ -283,7 +271,7 @@ export default function Members() {
                 className="h-8 gap-1 px-2"
                 aria-label="Previous page"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <Icon as={ChevronLeft} className="w-4 h-4" />
                 <span className="hidden sm:inline">Prev</span>
               </Button>
               {pageNumbers.map((n, i) =>
@@ -321,7 +309,7 @@ export default function Members() {
                 aria-label="Next page"
               >
                 <span className="hidden sm:inline">Next</span>
-                <ChevronRight className="w-4 h-4" />
+                <Icon as={ChevronRight} className="w-4 h-4" />
               </Button>
             </nav>
           </div>
