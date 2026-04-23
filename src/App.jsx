@@ -35,7 +35,20 @@ const AuthenticatedApp = () => {
     );
   }
 
-  const publicPaths = ["/", "/partners"];
+  // Paths accessible to unauthenticated visitors when the app's auth
+  // preflight returns auth_required. The landing page, partners page,
+  // and the onboarding form are the entry points for new users — they
+  // must be reachable without a Base44 account. The user will sign
+  // up / create their Base44 account as part of the onboarding flow
+  // itself (before Stripe checkout, which needs an account to attach
+  // the subscription to).
+  //
+  // /onboarding was previously NOT in this list, which meant clicking
+  // 'I'm a TC' / 'Join as TC' on the landing page redirected
+  // unauthenticated visitors to Base44 login — a dead-end for people
+  // who don't yet have accounts. Added so the signup flow actually
+  // works for new users.
+  const publicPaths = ["/", "/partners", "/onboarding"];
   const currentPath = window.location.pathname;
 
   if (authError) {
@@ -47,6 +60,7 @@ const AuthenticatedApp = () => {
           <Routes>
             <Route path="/" element={<LandingPage user={null} />} />
             <Route path="/partners" element={<PartnersPage user={null} />} />
+            <Route path="/onboarding" element={<Onboarding />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         );
