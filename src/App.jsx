@@ -17,9 +17,12 @@ import PartnersPage from "./pages/PartnersPage";
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
-  // Only fetch the user once the auth preflight is done and there's no authError.
-  // react-query dedupes this across the app — every other page/useCurrentUser()
-  // call will hit the same cache entry.
+  // Fetch the user once the auth preflight is done and there's no authError.
+  // AuthContext's checkUserAuth pre-warms the react-query cache on successful
+  // bootstrap (via queryClientInstance.setQueryData), so this useCurrentUser
+  // call will hit the cache immediately on first render — no redundant
+  // base44.auth.me() fetch. Every other page's useCurrentUser() hits the
+  // same cache entry.
   const { data: user, isLoading: loadingUser } = useCurrentUser({
     enabled: !isLoadingAuth && !isLoadingPublicSettings && !authError,
   });
