@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Building2, ShieldCheck, Pencil, MessageSquare, CheckCircle2, Award } from "lucide-react";
 import { toast } from "sonner";
+import { toastMutationError } from "@/lib/toasts";
 
 export default function TCProfilePage() {
   const [searchParams] = useSearchParams();
@@ -63,10 +64,17 @@ export default function TCProfilePage() {
       deals_closed: Number(formData.deals_closed) || 0,
       response_rate: Number(formData.response_rate) || 0,
     };
-    if (profile?.id) {
-      await base44.entities.TCProfile.update(profile.id, data);
-    } else {
-      await base44.entities.TCProfile.create({ ...data, user_id: currentUser.id });
+    try {
+      if (profile?.id) {
+        await base44.entities.TCProfile.update(profile.id, data);
+      } else {
+        await base44.entities.TCProfile.create({ ...data, user_id: currentUser.id });
+      }
+    } catch (e) {
+      console.error("TCProfile save failed:", e);
+      toastMutationError("save profile");
+      setSaving(false);
+      return;
     }
     toast.success("Profile saved successfully");
     setSaving(false);

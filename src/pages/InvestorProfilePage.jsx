@@ -9,6 +9,7 @@ import GradientButton from "../components/GradientButton";
 import { Button } from "@/components/ui/button";
 import { MapPin, Building2, Pencil, MessageSquare, ClipboardList, Users, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
+import { toastMutationError } from "@/lib/toasts";
 
 function StatCard({ icon: Icon, label, value }) {
   return (
@@ -56,10 +57,17 @@ export default function InvestorProfilePage() {
 
   const handleSave = async (formData) => {
     setSaving(true);
-    if (profile?.id) {
-      await base44.entities.InvestorProfile.update(profile.id, formData);
-    } else {
-      await base44.entities.InvestorProfile.create({ ...formData, user_id: currentUser.id });
+    try {
+      if (profile?.id) {
+        await base44.entities.InvestorProfile.update(profile.id, formData);
+      } else {
+        await base44.entities.InvestorProfile.create({ ...formData, user_id: currentUser.id });
+      }
+    } catch (e) {
+      console.error("InvestorProfile save failed:", e);
+      toastMutationError("save profile");
+      setSaving(false);
+      return;
     }
     toast.success("Profile saved successfully");
     setSaving(false);

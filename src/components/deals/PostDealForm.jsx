@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import GradientButton from "@/components/GradientButton";
 import { Button } from "@/components/ui/button";
+import { toastMutationError } from "@/lib/toasts";
 
 const PROPERTY_TYPES = ["SFR", "Multi-Family 2-4", "Multi-Family 5+", "Commercial", "Mixed-Use", "Land", "Condo/TH"];
 const DEAL_TYPES = ["Fix & Flip", "DSCR", "Creative Finance", "Wholesale", "Ground-Up Construction", "Short-Term Rental", "Bridge", "Lease Option"];
@@ -30,10 +31,17 @@ export default function PostDealForm({ user, onSave, onCancel, editDeal }) {
       investor_name: user.full_name,
       status: editDeal?.status || "open",
     };
-    if (editDeal) {
-      await base44.entities.Deal.update(editDeal.id, payload);
-    } else {
-      await base44.entities.Deal.create(payload);
+    try {
+      if (editDeal) {
+        await base44.entities.Deal.update(editDeal.id, payload);
+      } else {
+        await base44.entities.Deal.create(payload);
+      }
+    } catch (err) {
+      console.error("PostDealForm submit failed:", err);
+      toastMutationError(editDeal ? "update deal" : "post deal");
+      setSaving(false);
+      return;
     }
     setSaving(false);
     onSave();
