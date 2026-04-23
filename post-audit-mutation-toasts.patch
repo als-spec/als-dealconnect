@@ -1,0 +1,390 @@
+From 651f14bb7f58f9c1ce2762a9f2c68f08680d4bd1 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Thu, 23 Apr 2026 16:55:46 +0000
+Subject: [PATCH] Mutation error handling: fix silent failures in 6 handlers
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Outside-audit cleanup. Adds try/catch + user-visible toast to six
+handleSave/handleAction handlers that called base44.entities.X.update/
+create without error handling. On failure, the user would see a stuck
+loading spinner with no feedback; the operation had to be diagnosed
+from the Network tab.
+
+Scope re-evaluation during reconnaissance:
+
+  Originally planned as 'mutation toast consolidation' — migrate sites
+  to useMutation, centralize toast in mutationCache.onError. But grep
+  showed ZERO sites currently use useMutation (the mutationCache.onError
+  comment is aspirational). That migration is a 2-4 hour refactor, too
+  big for a finisher PR.
+
+  Instead: real bug fix with the same 30-60 min budget. 5 of 6 handlers
+  had no error handling at all — silent failure on any mutation error
+  (network, validation, permission). AdminDashboard.handleAction is
+  the worst offender: if MemberApplication.update or User.update fails,
+  processing state never resets and the approve/reject button hangs
+  forever.
+
+Sites fixed (all wrap the mutation in try/catch, toast on failure,
+restore loading state, early-return from the success path):
+
+  1. src/pages/dashboard/AdminDashboard.jsx — handleAction
+     Was: two member updates without try/catch, then email in its own
+     try/catch with an empty catch.
+     Now: member updates are the critical path (try/catch + toast +
+     reset), email stays best-effort (try/catch + log only, so an
+     email failure doesn't block a successful approval).
+
+  2. src/pages/admin/Members.jsx — handleSave
+     Single User.update; try/catch + toast + setSaving(false).
+
+  3. src/pages/TCProfilePage.jsx — handleSave
+     TCProfile.update or .create; try/catch + toast + setSaving(false).
+
+  4. src/pages/InvestorProfilePage.jsx — handleSave
+     Same pattern as TC.
+
+  5. src/pages/PMLProfilePage.jsx — handleSave
+     Same pattern as TC.
+
+  6. src/components/deals/PostDealForm.jsx — handleSubmit
+     Deal.update or .create; try/catch + toast + setSaving(false).
+     On error, dialog stays open so the user can retry.
+
+New file: src/lib/toasts.js
+
+  Single helper (toastMutationError(action)) that wraps toast.error
+  with the 'Failed to ${action}. Please try again.' phrasing. Matches
+  the existing inline 'Failed to X. Please try again.' style used
+  in ~13 other handlers, so new error toasts blend in with the old.
+
+  This file is also the natural home for future toast utilities. If a
+  later PR migrates handlers to useMutation, mutationCache.onError in
+  query-client.js can call toastMutationError to centralize the toast
+  without changing copy.
+
+Not in scope (follow-ups):
+
+  - Existing 'Failed to X' toasts NOT migrated to the helper. They
+    work fine; migrating them would touch ~10 more files for zero
+    user-visible change. The helper is available when someone wants
+    to do that cleanup.
+
+  - useMutation migration. Would be the 'right' architecture per the
+    query-client.js comment, but it's multi-hour work touching ~10
+    handlers. This PR delivers the real bug fix (visible errors)
+    without the architecture change.
+
+  - DealBoard, Messages, PartnersPage, DealDetailModal all already
+    have try/catch with user feedback (inline setError or toast);
+    untouched.
+
+Verification:
+
+  - npm run lint: 0 errors (full codebase)
+  - Scoped lint: 0 errors, 3 pre-existing warnings
+  - npm run build: succeeds
+  - All new catch handlers log to console.error AND show toast, so
+    debugging info isn't lost when the user-facing toast fires
+
+Files (7):
+  - src/lib/toasts.js (+45, new file)
+  - src/pages/dashboard/AdminDashboard.jsx (+23/-14)
+  - src/pages/admin/Members.jsx (+9/-1)
+  - src/pages/TCProfilePage.jsx (+13/-5)
+  - src/pages/InvestorProfilePage.jsx (+13/-5)
+  - src/pages/PMLProfilePage.jsx (+13/-5)
+  - src/components/deals/PostDealForm.jsx (+14/-5)
+---
+ src/components/deals/PostDealForm.jsx  | 16 +++++++---
+ src/lib/toasts.js                      | 42 ++++++++++++++++++++++++++
+ src/pages/InvestorProfilePage.jsx      | 16 +++++++---
+ src/pages/PMLProfilePage.jsx           | 16 +++++++---
+ src/pages/TCProfilePage.jsx            | 16 +++++++---
+ src/pages/admin/Members.jsx            | 10 +++++-
+ src/pages/dashboard/AdminDashboard.jsx | 38 +++++++++++++++--------
+ 7 files changed, 124 insertions(+), 30 deletions(-)
+ create mode 100644 src/lib/toasts.js
+
+diff --git a/src/components/deals/PostDealForm.jsx b/src/components/deals/PostDealForm.jsx
+index 288c73f..c1d4945 100644
+--- a/src/components/deals/PostDealForm.jsx
++++ b/src/components/deals/PostDealForm.jsx
+@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
+ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+ import GradientButton from "@/components/GradientButton";
+ import { Button } from "@/components/ui/button";
++import { toastMutationError } from "@/lib/toasts";
+ 
+ const PROPERTY_TYPES = ["SFR", "Multi-Family 2-4", "Multi-Family 5+", "Commercial", "Mixed-Use", "Land", "Condo/TH"];
+ const DEAL_TYPES = ["Fix & Flip", "DSCR", "Creative Finance", "Wholesale", "Ground-Up Construction", "Short-Term Rental", "Bridge", "Lease Option"];
+@@ -30,10 +31,17 @@ export default function PostDealForm({ user, onSave, onCancel, editDeal }) {
+       investor_name: user.full_name,
+       status: editDeal?.status || "open",
+     };
+-    if (editDeal) {
+-      await base44.entities.Deal.update(editDeal.id, payload);
+-    } else {
+-      await base44.entities.Deal.create(payload);
++    try {
++      if (editDeal) {
++        await base44.entities.Deal.update(editDeal.id, payload);
++      } else {
++        await base44.entities.Deal.create(payload);
++      }
++    } catch (err) {
++      console.error("PostDealForm submit failed:", err);
++      toastMutationError(editDeal ? "update deal" : "post deal");
++      setSaving(false);
++      return;
+     }
+     setSaving(false);
+     onSave();
+diff --git a/src/lib/toasts.js b/src/lib/toasts.js
+new file mode 100644
+index 0000000..a326aad
+--- /dev/null
++++ b/src/lib/toasts.js
+@@ -0,0 +1,42 @@
++import { toast } from "sonner";
++
++/**
++ * Shared toast helpers for consistent copy across mutation failure paths.
++ *
++ * Why these exist:
++ *   - Before this file, handlers that wrapped base44.entities.X.update/create
++ *     calls had slightly varied error phrasing ("Failed to save", "Upload
++ *     failed", "Error updating", etc.), and a meaningful fraction of
++ *     handlers had NO catch block at all — mutations could silently fail
++ *     with the user seeing only a stuck loading spinner.
++ *
++ *   - Using a single helper gives us one phrasing to maintain, and makes
++ *     it obvious in code review when a mutation site is missing its
++ *     error path (no `toastMutationError` import = red flag).
++ *
++ * Intentionally small: just two helpers. If this file grows past ~100
++ * lines of toast utilities, split it up.
++ */
++
++/**
++ * Show a standardized error toast for a failed mutation.
++ * Use inside catch blocks wrapping base44.entities.X.update/create/delete
++ * calls, or any other write path where the user expected their action
++ * to succeed.
++ *
++ * The `action` parameter should be a lowercase verb phrase describing
++ * what was being attempted from the user's perspective.
++ *
++ * @example
++ *   try {
++ *     await base44.entities.User.update(id, updates);
++ *     toast.success("Member updated");
++ *   } catch (e) {
++ *     toastMutationError("update member");
++ *   }
++ *
++ * Resulting toast: "Failed to update member. Please try again."
++ */
++export function toastMutationError(action) {
++  toast.error(`Failed to ${action}. Please try again.`);
++}
+diff --git a/src/pages/InvestorProfilePage.jsx b/src/pages/InvestorProfilePage.jsx
+index 44e0e34..c3956bb 100644
+--- a/src/pages/InvestorProfilePage.jsx
++++ b/src/pages/InvestorProfilePage.jsx
+@@ -9,6 +9,7 @@ import GradientButton from "../components/GradientButton";
+ import { Button } from "@/components/ui/button";
+ import { MapPin, Building2, Pencil, MessageSquare, ClipboardList, Users, TrendingUp } from "lucide-react";
+ import { toast } from "sonner";
++import { toastMutationError } from "@/lib/toasts";
+ 
+ function StatCard({ icon: Icon, label, value }) {
+   return (
+@@ -56,10 +57,17 @@ export default function InvestorProfilePage() {
+ 
+   const handleSave = async (formData) => {
+     setSaving(true);
+-    if (profile?.id) {
+-      await base44.entities.InvestorProfile.update(profile.id, formData);
+-    } else {
+-      await base44.entities.InvestorProfile.create({ ...formData, user_id: currentUser.id });
++    try {
++      if (profile?.id) {
++        await base44.entities.InvestorProfile.update(profile.id, formData);
++      } else {
++        await base44.entities.InvestorProfile.create({ ...formData, user_id: currentUser.id });
++      }
++    } catch (e) {
++      console.error("InvestorProfile save failed:", e);
++      toastMutationError("save profile");
++      setSaving(false);
++      return;
+     }
+     toast.success("Profile saved successfully");
+     setSaving(false);
+diff --git a/src/pages/PMLProfilePage.jsx b/src/pages/PMLProfilePage.jsx
+index f436812..4ea5272 100644
+--- a/src/pages/PMLProfilePage.jsx
++++ b/src/pages/PMLProfilePage.jsx
+@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
+ import { Badge } from "@/components/ui/badge";
+ import { MapPin, Building2, ShieldCheck, Pencil, MessageSquare, CheckCircle2, DollarSign, Clock, TrendingUp, Zap } from "lucide-react";
+ import { toast } from "sonner";
++import { toastMutationError } from "@/lib/toasts";
+ import { cn } from "@/lib/utils";
+ 
+ const TIER_STYLES = {
+@@ -52,10 +53,17 @@ export default function PMLProfilePage() {
+ 
+   const handleSave = async (formData) => {
+     setSaving(true);
+-    if (profile?.id) {
+-      await base44.entities.PMLProfile.update(profile.id, formData);
+-    } else {
+-      await base44.entities.PMLProfile.create({ ...formData, user_id: currentUser.id });
++    try {
++      if (profile?.id) {
++        await base44.entities.PMLProfile.update(profile.id, formData);
++      } else {
++        await base44.entities.PMLProfile.create({ ...formData, user_id: currentUser.id });
++      }
++    } catch (e) {
++      console.error("PMLProfile save failed:", e);
++      toastMutationError("save profile");
++      setSaving(false);
++      return;
+     }
+     toast.success("Profile saved successfully");
+     setSaving(false);
+diff --git a/src/pages/TCProfilePage.jsx b/src/pages/TCProfilePage.jsx
+index 3ab2869..74bc9fa 100644
+--- a/src/pages/TCProfilePage.jsx
++++ b/src/pages/TCProfilePage.jsx
+@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
+ import { Badge } from "@/components/ui/badge";
+ import { MapPin, Building2, ShieldCheck, Pencil, MessageSquare, CheckCircle2, Award } from "lucide-react";
+ import { toast } from "sonner";
++import { toastMutationError } from "@/lib/toasts";
+ 
+ export default function TCProfilePage() {
+   const [searchParams] = useSearchParams();
+@@ -63,10 +64,17 @@ export default function TCProfilePage() {
+       deals_closed: Number(formData.deals_closed) || 0,
+       response_rate: Number(formData.response_rate) || 0,
+     };
+-    if (profile?.id) {
+-      await base44.entities.TCProfile.update(profile.id, data);
+-    } else {
+-      await base44.entities.TCProfile.create({ ...data, user_id: currentUser.id });
++    try {
++      if (profile?.id) {
++        await base44.entities.TCProfile.update(profile.id, data);
++      } else {
++        await base44.entities.TCProfile.create({ ...data, user_id: currentUser.id });
++      }
++    } catch (e) {
++      console.error("TCProfile save failed:", e);
++      toastMutationError("save profile");
++      setSaving(false);
++      return;
+     }
+     toast.success("Profile saved successfully");
+     setSaving(false);
+diff --git a/src/pages/admin/Members.jsx b/src/pages/admin/Members.jsx
+index fe4777d..f36d830 100644
+--- a/src/pages/admin/Members.jsx
++++ b/src/pages/admin/Members.jsx
+@@ -11,6 +11,7 @@ import { Search, Users, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+ import GradientButton from "../../components/GradientButton";
+ import { cn } from "@/lib/utils";
+ import { toast } from "sonner";
++import { toastMutationError } from "@/lib/toasts";
+ 
+ const ROLE_LABELS = {
+   admin: "Admin",
+@@ -110,7 +111,14 @@ export default function Members() {
+     if (editData.member_status === "approved" && editData.role !== "admin") {
+       updates.onboarding_step = "approved";
+     }
+-    await base44.entities.User.update(selectedMember.id, updates);
++    try {
++      await base44.entities.User.update(selectedMember.id, updates);
++    } catch (e) {
++      console.error("Members handleSave failed:", e);
++      toastMutationError("update member");
++      setSaving(false);
++      return;
++    }
+     toast.success("Member updated successfully");
+     setSaving(false);
+     setSelectedMember(null);
+diff --git a/src/pages/dashboard/AdminDashboard.jsx b/src/pages/dashboard/AdminDashboard.jsx
+index 8bf46a3..2d05288 100644
+--- a/src/pages/dashboard/AdminDashboard.jsx
++++ b/src/pages/dashboard/AdminDashboard.jsx
+@@ -6,6 +6,7 @@ import { Users, ClipboardList, MessageSquare, CheckCircle2, XCircle, Building2,
+ import { Button } from "@/components/ui/button";
+ import GradientButton from "../../components/GradientButton";
+ import { toast } from "sonner";
++import { toastMutationError } from "@/lib/toasts";
+ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+ 
+ const TYPE_LABELS = { tc: "Transaction Coordinator", investor: "Investor / Agent", pml: "Private Money Lender" };
+@@ -101,20 +102,29 @@ export default function AdminDashboard({ user }) {
+   const handleAction = async (appId, action) => {
+     setProcessing(appId + action);
+     const app = applications.find(a => a.id === appId);
+-    if (!app._synthetic) {
+-      await base44.entities.MemberApplication.update(appId, {
+-        status: action,
+-        reviewed_date: new Date().toISOString(),
+-      });
+-    }
+-    if (app.user_id) {
+-      const userUpdate = { member_status: action };
+-      if (action === "approved") {
+-        userUpdate.role = app.member_type;
+-        userUpdate.onboarding_step = "approved";
++    try {
++      if (!app._synthetic) {
++        await base44.entities.MemberApplication.update(appId, {
++          status: action,
++          reviewed_date: new Date().toISOString(),
++        });
++      }
++      if (app.user_id) {
++        const userUpdate = { member_status: action };
++        if (action === "approved") {
++          userUpdate.role = app.member_type;
++          userUpdate.onboarding_step = "approved";
++        }
++        await base44.entities.User.update(app.user_id, userUpdate);
+       }
+-      await base44.entities.User.update(app.user_id, userUpdate);
++    } catch (e) {
++      console.error("handleAction mutation failed:", e);
++      toastMutationError(`${action === "approved" ? "approve" : "reject"} application`);
++      setProcessing(null);
++      return;
+     }
++    // Email send is a best-effort notification — its own try/catch keeps
++    // the approval action successful even if the welcome email fails.
+     try {
+       if (action === "approved") {
+         await base44.integrations.Core.SendEmail({
+@@ -129,7 +139,9 @@ export default function AdminDashboard({ user }) {
+           body: `Hi ${app.full_name},\n\nThank you for applying to ALS DealConnect. After reviewing your application, we are unable to approve your membership at this time.\n\nThe ALS DealConnect Team`,
+         });
+       }
+-    } catch (e) {}
++    } catch (e) {
++      console.error("handleAction email send failed:", e);
++    }
+     toast.success(`Application ${action}`);
+     setProcessing(null);
+     refreshAfterMutation();
+-- 
+2.43.0
+
