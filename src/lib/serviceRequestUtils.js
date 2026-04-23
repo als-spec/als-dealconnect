@@ -44,9 +44,13 @@ export function formatRequestDate(d) {
 
 /**
  * Can this user advance the status of a ServiceRequest?
- * Only TCs and admins can advance status. Investors are read-only on the
- * stepper.
+ *
+ * Only TCs can advance status — they are the workflow owners for the
+ * transaction. Investors are read-only on the stepper (they wait for
+ * the TC to move things forward). Admin is oversight-only (T2.6.2) —
+ * admin can see the stepper but doesn't push transactions through it.
+ * PMLs don't participate in the TC/investor ServiceRequest flow.
  */
 export function canAdvanceStatus(userRole) {
-  return userRole === "tc" || userRole === "admin";
+  return userRole === "tc";
 }
