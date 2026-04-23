@@ -117,13 +117,28 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        {!collapsed && <Logo size="sm" />}
-        <button
-          onClick={onToggle}
-          className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground"
-        >
-          {collapsed ? <Menu className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-        </button>
+        {collapsed ? (
+          <button
+            onClick={onToggle}
+            className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground mx-auto"
+            title="ALS Deal Connect"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        ) : (
+          <>
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <Logo size="sm" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/40 pl-0.5">ALS Deal Connect</span>
+            </div>
+            <button
+              onClick={onToggle}
+              className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground shrink-0"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Role badge */}
