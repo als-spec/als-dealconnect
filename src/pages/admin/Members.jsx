@@ -11,6 +11,7 @@ import { Search, Users, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import GradientButton from "../../components/GradientButton";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { toastMutationError } from "@/lib/toasts";
 
 const ROLE_LABELS = {
   admin: "Admin",
@@ -110,7 +111,14 @@ export default function Members() {
     if (editData.member_status === "approved" && editData.role !== "admin") {
       updates.onboarding_step = "approved";
     }
-    await base44.entities.User.update(selectedMember.id, updates);
+    try {
+      await base44.entities.User.update(selectedMember.id, updates);
+    } catch (e) {
+      console.error("Members handleSave failed:", e);
+      toastMutationError("update member");
+      setSaving(false);
+      return;
+    }
     toast.success("Member updated successfully");
     setSaving(false);
     setSelectedMember(null);

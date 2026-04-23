@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Building2, ShieldCheck, Pencil, MessageSquare, CheckCircle2, DollarSign, Clock, TrendingUp, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { toastMutationError } from "@/lib/toasts";
 import { cn } from "@/lib/utils";
 
 const TIER_STYLES = {
@@ -52,10 +53,17 @@ export default function PMLProfilePage() {
 
   const handleSave = async (formData) => {
     setSaving(true);
-    if (profile?.id) {
-      await base44.entities.PMLProfile.update(profile.id, formData);
-    } else {
-      await base44.entities.PMLProfile.create({ ...formData, user_id: currentUser.id });
+    try {
+      if (profile?.id) {
+        await base44.entities.PMLProfile.update(profile.id, formData);
+      } else {
+        await base44.entities.PMLProfile.create({ ...formData, user_id: currentUser.id });
+      }
+    } catch (e) {
+      console.error("PMLProfile save failed:", e);
+      toastMutationError("save profile");
+      setSaving(false);
+      return;
     }
     toast.success("Profile saved successfully");
     setSaving(false);

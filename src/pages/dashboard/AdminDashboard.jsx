@@ -6,6 +6,7 @@ import { Users, ClipboardList, MessageSquare, CheckCircle2, XCircle, Building2, 
 import { Button } from "@/components/ui/button";
 import GradientButton from "../../components/GradientButton";
 import { toast } from "sonner";
+import { toastMutationError } from "@/lib/toasts";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
 const TYPE_LABELS = { tc: "Transaction Coordinator", investor: "Investor / Agent", pml: "Private Money Lender" };
@@ -101,20 +102,29 @@ export default function AdminDashboard({ user }) {
   const handleAction = async (appId, action) => {
     setProcessing(appId + action);
     const app = applications.find(a => a.id === appId);
-    if (!app._synthetic) {
-      await base44.entities.MemberApplication.update(appId, {
-        status: action,
-        reviewed_date: new Date().toISOString(),
-      });
-    }
-    if (app.user_id) {
-      const userUpdate = { member_status: action };
-      if (action === "approved") {
-        userUpdate.role = app.member_type;
-        userUpdate.onboarding_step = "approved";
+    try {
+      if (!app._synthetic) {
+        await base44.entities.MemberApplication.update(appId, {
+          status: action,
+          reviewed_date: new Date().toISOString(),
+        });
       }
-      await base44.entities.User.update(app.user_id, userUpdate);
+      if (app.user_id) {
+        const userUpdate = { member_status: action };
+        if (action === "approved") {
+          userUpdate.role = app.member_type;
+          userUpdate.onboarding_step = "approved";
+        }
+        await base44.entities.User.update(app.user_id, userUpdate);
+      }
+    } catch (e) {
+      console.error("handleAction mutation failed:", e);
+      toastMutationError(`${action === "approved" ? "approve" : "reject"} application`);
+      setProcessing(null);
+      return;
     }
+    // Email send is a best-effort notification — its own try/catch keeps
+    // the approval action successful even if the welcome email fails.
     try {
       if (action === "approved") {
         await base44.integrations.Core.SendEmail({
@@ -129,7 +139,9 @@ export default function AdminDashboard({ user }) {
           body: `Hi ${app.full_name},\n\nThank you for applying to ALS DealConnect. After reviewing your application, we are unable to approve your membership at this time.\n\nThe ALS DealConnect Team`,
         });
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("handleAction email send failed:", e);
+    }
     toast.success(`Application ${action}`);
     setProcessing(null);
     refreshAfterMutation();
