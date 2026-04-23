@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,28 +28,31 @@ const STATUS_STYLES = {
 };
 
 export default function Applications() {
-  const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [selectedApp, setSelectedApp] = useState(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [processing, setProcessing] = useState(false);
   const [filter, setFilter] = useState("pending");
 
-  useEffect(() => {
-    loadApplications();
-  }, []);
+  // Real member applications, newest first.
+  const { data: apps = [], isLoading: loadingApps } = useQuery({
+    queryKey: ['MemberApplication', 'list', { sort: '-created_date' }],
+    queryFn: () => base44.entities.MemberApplication.list("-created_date"),
+  });
 
-  const loadApplications = async () => {
-    const [apps, pendingUsersRaw] = await Promise.all([
-      base44.entities.MemberApplication.list("-created_date"),
-      // Scope server-side to pending members instead of pulling the full user
-      // table. Per Onboarding.jsx, `member_status: "pending"` is set together
-      // with `onboarding_step: "pending_approval"` — so this filter catches
-      // both conditions the client previously OR'd together.
-      base44.entities.User.filter({ member_status: "pending" }),
-    ]);
+  // Pending users (some may not have a MemberApplication yet — we synthesize).
+  // Scoped server-side to members with pending status. Per Onboarding.jsx,
+  // member_status: "pending" is set together with onboarding_step: "pending_approval",
+  // so this filter catches both conditions the client previously OR'd together.
+  const { data: pendingUsersRaw = [], isLoading: loadingUsers } = useQuery({
+    queryKey: ['User', { member_status: 'pending' }],
+    queryFn: () => base44.entities.User.filter({ member_status: "pending" }),
+  });
 
-    // Add synthetic entries for pending users who have no MemberApplication.
+  // Derive synthetic applications for pending users with no MemberApplication.
+  // useMemo keeps this stable across renders as long as the underlying
+  // queries haven't updated.
+  const applications = useMemo(() => {
     const appUserIds = new Set(apps.map(a => a.user_id).filter(Boolean));
     const pendingUsers = pendingUsersRaw.filter(u => !appUserIds.has(u.id));
     const syntheticApps = pendingUsers.map(u => ({
@@ -62,9 +66,16 @@ export default function Applications() {
       status: "pending",
       _synthetic: true,
     }));
+    return [...apps, ...syntheticApps];
+  }, [apps, pendingUsersRaw]);
 
-    setApplications([...apps, ...syntheticApps]);
-    setLoading(false);
+  const loading = loadingApps || loadingUsers;
+
+  // Invalidate both queries after a mutation — applications list, pending users,
+  // plus the global User cache in case approval changed a user's role.
+  const refreshAfterMutation = () => {
+    queryClient.invalidateQueries({ queryKey: ['MemberApplication'] });
+    queryClient.invalidateQueries({ queryKey: ['User'] });
   };
 
   const handleAction = async (appId, action) => {
@@ -116,7 +127,7 @@ export default function Applications() {
       setSelectedApp(null);
       setAdminNotes("");
       setProcessing(false);
-      loadApplications();
+      refreshAfterMutation();
       return;
     }
 
@@ -124,7 +135,7 @@ export default function Applications() {
     setSelectedApp(null);
     setAdminNotes("");
     setProcessing(false);
-    loadApplications();
+    refreshAfterMutation();
   };
 
   const filtered = applications.filter((a) => filter === "all" || a.status === filter);

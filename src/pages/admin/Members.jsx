@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -40,25 +41,19 @@ const PLAN_LABELS = {
 };
 
 export default function Members() {
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [selectedMember, setSelectedMember] = useState(null);
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const load = async () => {
-    // Admin member-management needs the full user table. Pagination is tracked
-    // as T3.4 — at scale this should become a paginated server-side query.
-    const users = await base44.entities.User.list("-created_date");
-    setMembers(users);
-    setLoading(false);
-  };
+  // Admin member-management needs the full user table. Pagination is tracked
+  // as T3.4 — at scale this should become a paginated server-side query.
+  const { data: members = [], isLoading: loading } = useQuery({
+    queryKey: ['User', 'list', { sort: '-created_date' }],
+    queryFn: () => base44.entities.User.list("-created_date"),
+  });
 
   const openEdit = (member) => {
     setSelectedMember(member);
@@ -81,7 +76,7 @@ export default function Members() {
     toast.success("Member updated successfully");
     setSaving(false);
     setSelectedMember(null);
-    load();
+    queryClient.invalidateQueries({ queryKey: ['User'] });
   };
 
   const filtered = members.filter((m) => {

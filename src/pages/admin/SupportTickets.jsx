@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { LifeBuoy, Loader2, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
@@ -22,22 +23,18 @@ const PRIORITY_STYLES = {
 
 export default function AdminSupportTickets() {
   const { data: user } = useCurrentUser();
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState(null);
   const [comment, setComment] = useState("");
   const [commentingId, setCommentingId] = useState(null);
   const [filter, setFilter] = useState("all");
 
-  const load = useCallback(async () => {
-    const all = await base44.entities.SupportTicket.list("-created_date");
-    setTickets(all);
-    setLoading(false);
-  }, []);
+  const { data: tickets = [], isLoading: loading } = useQuery({
+    queryKey: ['SupportTicket', 'list', { sort: '-created_date' }],
+    queryFn: () => base44.entities.SupportTicket.list("-created_date"),
+  });
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const refreshTickets = () => queryClient.invalidateQueries({ queryKey: ['SupportTicket'] });
 
   const updateStatus = async (ticket, status) => {
     await base44.entities.SupportTicket.update(ticket.id, { status });
@@ -50,7 +47,7 @@ export default function AdminSupportTickets() {
       });
     } catch (e) {}
     toast.success(`Ticket marked as ${status.replace("_", " ")}`);
-    load();
+    refreshTickets();
   };
 
   const handleComment = async (ticket) => {
@@ -77,7 +74,7 @@ export default function AdminSupportTickets() {
     setComment("");
     setCommentingId(null);
     toast.success("Reply sent.");
-    load();
+    refreshTickets();
   };
 
   const filtered = filter === "all" ? tickets : tickets.filter(t => t.status === filter);
