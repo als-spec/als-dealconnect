@@ -36,19 +36,26 @@ const AuthenticatedApp = () => {
   }
 
   // Paths accessible to unauthenticated visitors when the app's auth
-  // preflight returns auth_required. The landing page, partners page,
-  // and the onboarding form are the entry points for new users — they
-  // must be reachable without a Base44 account. The user will sign
-  // up / create their Base44 account as part of the onboarding flow
-  // itself (before Stripe checkout, which needs an account to attach
-  // the subscription to).
+  // preflight returns auth_required.
   //
-  // /onboarding was previously NOT in this list, which meant clicking
-  // 'I'm a TC' / 'Join as TC' on the landing page redirected
-  // unauthenticated visitors to Base44 login — a dead-end for people
-  // who don't yet have accounts. Added so the signup flow actually
-  // works for new users.
-  const publicPaths = ["/", "/partners", "/onboarding"];
+  // /onboarding is NOT in this list. Even though it's the destination
+  // of every landing-page CTA, unauthenticated users can't complete
+  // the flow — every step handler (handleMemberTypeNext,
+  // handlePlanNext, handleNDAAccept, etc.) calls base44.auth.updateMe
+  // which requires a valid session. Letting unauthenticated users
+  // reach /onboarding results in cascading 403s and a page that
+  // renders but can't advance.
+  //
+  // The correct flow for new users:
+  //   1. Click 'I'm a TC' → navigates to /onboarding?type=tc
+  //   2. App hits this branch: /onboarding not in publicPaths
+  //   3. navigateToLogin() redirects to Base44's login page
+  //   4. Base44's login page has 'Continue with Google' + email/password
+  //      + 'Need an account? Sign up' link
+  //   5. User signs up or signs in; Base44 preserves ?type=tc via from_url
+  //   6. User returns authenticated → /onboarding renders → step handlers
+  //      work because user is now authenticated.
+  const publicPaths = ["/", "/partners"];
   const currentPath = window.location.pathname;
 
   if (authError) {
@@ -60,7 +67,6 @@ const AuthenticatedApp = () => {
           <Routes>
             <Route path="/" element={<LandingPage user={null} />} />
             <Route path="/partners" element={<PartnersPage user={null} />} />
-            <Route path="/onboarding" element={<Onboarding />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         );
