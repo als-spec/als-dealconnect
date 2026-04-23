@@ -1,0 +1,1570 @@
+From d7363ea0c047807aecb0acf7f8076882ecfc6592 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Thu, 23 Apr 2026 12:48:37 +0000
+Subject: [PATCH] T2.4b: Decompose ServiceRequests god-component into 6 focused
+ components
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Second and final half of T2.4. Breaks the 532-line ServiceRequests.jsx
+god-component into a thin orchestrator (130 lines) plus six focused
+child components and a utilities module. Closes T2.4 entirely.
+
+New file layout:
+
+  src/pages/ServiceRequests.jsx (orchestrator, 130 lines)
+    - holds top-level state: selected, showMobileDetail, showNew
+    - two useQuery calls: ServiceRequest list + role-scoped User list
+    - role-scoped client filter (admin sees all; TC/investor see only
+      their own requests — Base44 single-key filter can't express the
+      OR so we fetch and filter)
+    - composes the 3 top-level children below
+
+  src/components/service-requests/RequestList.jsx (88 lines)
+    - sidebar with request list + status badges
+    - pure presentation, all data from props
+
+  src/components/service-requests/RequestDetail.jsx (160 lines)
+    - detail pane: header, stepper, timestamps, notes
+    - owns advanceStatus mutation (scalar writes only — no race)
+    - composes DocumentsSection + CommentsSection
+
+  src/components/service-requests/DocumentsSection.jsx (125 lines)
+    - documents list + upload button
+    - owns uploading state + file size/MIME validation
+    - PRESERVES T2.5 refetch-before-write for race safety
+
+  src/components/service-requests/CommentsSection.jsx (119 lines)
+    - comments thread + composer
+    - owns draft comment state
+    - PRESERVES T2.5 refetch-before-write for race safety
+
+  src/components/service-requests/ProgressStepper.jsx (51 lines)
+    - horizontal stage indicator (Requested -> Accepted ->
+      In Progress -> Completed), extracted verbatim
+
+  src/components/service-requests/NewRequestModal.jsx (168 lines)
+    - party picker + deal title + notes + create mutation
+    - invalidates ServiceRequest cache on create
+
+  src/lib/serviceRequestUtils.js (52 lines)
+    - pure helpers: STAGES, STATUS_NEXT, STATUS_COLORS,
+      MAX_FILE_SIZE, ALLOWED_FILE_TYPES, formatRequestDate,
+      canAdvanceStatus
+
+Behavior preserved exactly:
+- Role-scoped request filter (TC/investor see only their own, admin
+  sees all)
+- Role-scoped counterparty picker (TC sees investors, investor sees
+  TCs, admin sees all approved members)
+- Admins cannot create new requests (button hidden)
+- advanceStatus only available to TC and admin
+- Mobile nav: hide list when detail is open, back button returns
+- Progress stepper with animated spinner on current stage
+- Timestamps grid showing all 4 stages
+- Notes section (conditional on request.notes)
+- Document upload: 25MB cap, MIME whitelist, chip display
+- Comment thread with right-aligned 'mine' styling
+- Enter to post comment (Shift+Enter for newline)
+
+Behavior improvements:
+- Selected request syncs via onRequestUpdated callback from mutation
+  handlers instead of waiting for list refetch — detail pane updates
+  immediately after advance/comment/upload
+- ARIA labels added to icon-only buttons (back, close, upload, send,
+  new-request)
+- advanceStatus error now toasts instead of failing silently (was
+  already a catch block but the user never saw feedback if it was
+  a pre-existing server error state)
+
+T2.5 race fix preservation:
+DocumentsSection and CommentsSection both preserve the refetch-before-
+write pattern from T2.5. Each includes an explicit comment pointing at
+T2.5 so the fix survives future edits. advanceStatus does NOT need
+this pattern — it writes scalar fields only (status + one timestamp),
+no array read-modify-write.
+
+Mutation strategy (same as T2.4a and all prior T2.2 slices):
+No useMutation conversion — each mutation handler has its own shape
+(advanceStatus toasts on error, uploadDocument validates file first,
+addComment refetches-before-write). useMutation's generic wrappers
+add indirection without simplifying the logic. queryClient.invalidate
+after success is enough.
+
+Files:
+  Changed: src/pages/ServiceRequests.jsx (532 -> 130 lines)
+  Added:   src/components/service-requests/{7 new files}
+  Added:   src/lib/serviceRequestUtils.js
+
+Verification:
+- npm run lint: 0 errors (full codebase)
+- Scoped lint: 0 errors, 0 warnings on all new files
+- npm run build: succeeds
+---
+ .../service-requests/CommentsSection.jsx      | 119 ++++
+ .../service-requests/DocumentsSection.jsx     | 125 ++++
+ .../service-requests/NewRequestModal.jsx      | 168 +++++
+ .../service-requests/ProgressStepper.jsx      |  51 ++
+ .../service-requests/RequestDetail.jsx        | 160 +++++
+ .../service-requests/RequestList.jsx          |  88 +++
+ src/lib/serviceRequestUtils.js                |  52 ++
+ src/pages/ServiceRequests.jsx                 | 608 +++---------------
+ 8 files changed, 866 insertions(+), 505 deletions(-)
+ create mode 100644 src/components/service-requests/CommentsSection.jsx
+ create mode 100644 src/components/service-requests/DocumentsSection.jsx
+ create mode 100644 src/components/service-requests/NewRequestModal.jsx
+ create mode 100644 src/components/service-requests/ProgressStepper.jsx
+ create mode 100644 src/components/service-requests/RequestDetail.jsx
+ create mode 100644 src/components/service-requests/RequestList.jsx
+ create mode 100644 src/lib/serviceRequestUtils.js
+
+diff --git a/src/components/service-requests/CommentsSection.jsx b/src/components/service-requests/CommentsSection.jsx
+new file mode 100644
+index 0000000..4e80cc2
+--- /dev/null
++++ b/src/components/service-requests/CommentsSection.jsx
+@@ -0,0 +1,119 @@
++import { useState } from "react";
++import { useQueryClient } from "@tanstack/react-query";
++import { Send } from "lucide-react";
++import { Textarea } from "@/components/ui/textarea";
++import { cn } from "@/lib/utils";
++import { toast } from "sonner";
++import { base44 } from "@/api/base44Client";
++import { formatRequestDate } from "@/lib/serviceRequestUtils";
++
++/**
++ * Comments thread + composer for a ServiceRequest.
++ * Owns its own draft comment state.
++ *
++ * PRESERVES T2.5 QUICK FIX: before appending to the comments array, we
++ * refetch the fresh ServiceRequest record and append to THAT. Without this,
++ * a concurrent comment or document from the other party would be silently
++ * overwritten. See src/lib/serviceRequestUtils.js and T2.5 in the audit.
++ *
++ * Props:
++ *   request       - current ServiceRequest record
++ *   currentUser   - current user (for author attribution and "mine" styling)
++ *   onUpdated     - (updatedRequest) => void, called after successful post
++ *                   so the parent can sync its selected-request reference
++ */
++export default function CommentsSection({ request, currentUser, onUpdated }) {
++  const queryClient = useQueryClient();
++  const [newComment, setNewComment] = useState("");
++  const [posting, setPosting] = useState(false);
++
++  const handlePost = async () => {
++    if (!newComment.trim() || !request || !currentUser) return;
++    setPosting(true);
++    const comment = {
++      author_id: currentUser.id,
++      author_name: currentUser.full_name,
++      content: newComment.trim(),
++      timestamp: new Date().toISOString(),
++    };
++    try {
++      // T2.5 quick fix — refetch-before-write to avoid clobbering
++      // concurrent additions from the other party.
++      const fresh = (await base44.entities.ServiceRequest.filter({ id: request.id }))[0];
++      if (!fresh) {
++        toast.error("This request could not be found. It may have been deleted.");
++        return;
++      }
++      const updated = await base44.entities.ServiceRequest.update(request.id, {
++        comments: [...(fresh.comments || []), comment],
++      });
++      onUpdated?.(updated);
++      setNewComment("");
++      queryClient.invalidateQueries({ queryKey: ['ServiceRequest'] });
++    } catch {
++      toast.error("Failed to post comment. Please try again.");
++    } finally {
++      setPosting(false);
++    }
++  };
++
++  const comments = request?.comments || [];
++
++  return (
++    <div>
++      <h4 className="font-bold text-navy text-sm mb-3">Comments</h4>
++      <div className="space-y-3 mb-4">
++        {comments.length === 0 && (
++          <p className="text-sm text-muted-foreground">No comments yet.</p>
++        )}
++        {comments.map((c, i) => {
++          const isMine = c.author_id === currentUser?.id;
++          return (
++            <div key={i} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
++              <div className={cn(
++                "max-w-[80%] rounded-2xl px-4 py-2.5",
++                isMine
++                  ? "gradient-primary text-navy"
++                  : "bg-muted/60 text-foreground border border-border"
++              )}>
++                {!isMine && (
++                  <p className="text-xs font-semibold text-muted-foreground mb-1">{c.author_name}</p>
++                )}
++                <p className="text-sm">{c.content}</p>
++                <p className={cn(
++                  "text-xs mt-1 text-right",
++                  isMine ? "text-navy/60" : "text-muted-foreground"
++                )}>
++                  {formatRequestDate(c.timestamp)}
++                </p>
++              </div>
++            </div>
++          );
++        })}
++      </div>
++      <div className="flex gap-2">
++        <Textarea
++          value={newComment}
++          onChange={e => setNewComment(e.target.value)}
++          onKeyDown={e => {
++            if (e.key === 'Enter' && !e.shiftKey) {
++              e.preventDefault();
++              handlePost();
++            }
++          }}
++          placeholder="Add a comment…"
++          className="flex-1 min-h-[40px] max-h-[100px] resize-none text-sm"
++          rows={1}
++        />
++        <button
++          onClick={handlePost}
++          disabled={!newComment.trim() || posting}
++          className="gradient-primary text-white p-2.5 rounded-xl disabled:opacity-40 hover:opacity-90 transition-opacity flex-shrink-0"
++          aria-label="Post comment"
++        >
++          <Send className="w-4 h-4" />
++        </button>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/components/service-requests/DocumentsSection.jsx b/src/components/service-requests/DocumentsSection.jsx
+new file mode 100644
+index 0000000..5b01951
+--- /dev/null
++++ b/src/components/service-requests/DocumentsSection.jsx
+@@ -0,0 +1,125 @@
++import { useRef, useState } from "react";
++import { useQueryClient } from "@tanstack/react-query";
++import { FileText, Upload } from "lucide-react";
++import { toast } from "sonner";
++import { base44 } from "@/api/base44Client";
++import {
++  MAX_FILE_SIZE,
++  ALLOWED_FILE_TYPES,
++  formatRequestDate,
++} from "@/lib/serviceRequestUtils";
++
++/**
++ * Document list + upload button for a ServiceRequest.
++ * Owns its own uploading state.
++ *
++ * PRESERVES T2.5 QUICK FIX: before appending to the documents array, we
++ * refetch the fresh ServiceRequest record and append to THAT. Without this,
++ * a concurrent comment or document from the other party would be silently
++ * overwritten. See src/lib/serviceRequestUtils.js and T2.5 in the audit.
++ *
++ * Props:
++ *   request       - current ServiceRequest record
++ *   currentUser   - current user (for uploaded_by attribution)
++ *   onUpdated     - (updatedRequest) => void, called after successful upload
++ *                   so the parent can sync its selected-request reference
++ */
++export default function DocumentsSection({ request, currentUser, onUpdated }) {
++  const queryClient = useQueryClient();
++  const [uploading, setUploading] = useState(false);
++  const fileInputRef = useRef(null);
++
++  const handleUpload = async (e) => {
++    const file = e.target.files[0];
++    if (!file || !request || !currentUser) return;
++
++    if (file.size > MAX_FILE_SIZE) {
++      toast.error("File is too large. Maximum size is 25 MB.");
++      e.target.value = '';
++      return;
++    }
++    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
++      toast.error("File type not allowed. Please upload a PDF, image, Word, or Excel file.");
++      e.target.value = '';
++      return;
++    }
++
++    setUploading(true);
++    try {
++      const { file_url } = await base44.integrations.Core.UploadFile({ file });
++      const doc = {
++        name: file.name,
++        url: file_url,
++        uploaded_by: currentUser.full_name,
++        uploaded_at: new Date().toISOString(),
++      };
++      // T2.5 quick fix — refetch-before-write to avoid clobbering
++      // concurrent additions from the other party.
++      const fresh = (await base44.entities.ServiceRequest.filter({ id: request.id }))[0];
++      if (!fresh) {
++        toast.error("This request could not be found. It may have been deleted.");
++        return;
++      }
++      const updated = await base44.entities.ServiceRequest.update(request.id, {
++        documents: [...(fresh.documents || []), doc],
++      });
++      onUpdated?.(updated);
++      queryClient.invalidateQueries({ queryKey: ['ServiceRequest'] });
++    } catch {
++      toast.error("Upload failed. Please try again.");
++    } finally {
++      setUploading(false);
++      e.target.value = '';
++    }
++  };
++
++  const documents = request?.documents || [];
++
++  return (
++    <div>
++      <div className="flex items-center justify-between mb-2">
++        <h4 className="font-bold text-navy text-sm">Documents</h4>
++        <div>
++          <input
++            type="file"
++            ref={fileInputRef}
++            onChange={handleUpload}
++            className="hidden"
++          />
++          <button
++            onClick={() => fileInputRef.current?.click()}
++            disabled={uploading}
++            className="flex items-center gap-1.5 text-xs text-teal font-semibold hover:opacity-80 transition-opacity"
++            aria-label="Upload a document"
++          >
++            <Upload className="w-3.5 h-3.5" />
++            {uploading ? "Uploading…" : "Upload"}
++          </button>
++        </div>
++      </div>
++      {documents.length === 0 ? (
++        <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
++      ) : (
++        <div className="space-y-2">
++          {documents.map((doc, i) => (
++            <a
++              key={i}
++              href={doc.url}
++              target="_blank"
++              rel="noreferrer"
++              className="flex items-center gap-2 p-3 rounded-xl border border-border hover:border-teal/40 hover:bg-teal/5 transition-all group"
++            >
++              <FileText className="w-4 h-4 text-teal flex-shrink-0" />
++              <div className="flex-1 min-w-0">
++                <p className="text-sm font-medium text-navy truncate">{doc.name}</p>
++                <p className="text-xs text-muted-foreground">
++                  by {doc.uploaded_by} · {formatRequestDate(doc.uploaded_at)}
++                </p>
++              </div>
++            </a>
++          ))}
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/src/components/service-requests/NewRequestModal.jsx b/src/components/service-requests/NewRequestModal.jsx
+new file mode 100644
+index 0000000..4a86ef5
+--- /dev/null
++++ b/src/components/service-requests/NewRequestModal.jsx
+@@ -0,0 +1,168 @@
++import { useState, useMemo } from "react";
++import { useQueryClient } from "@tanstack/react-query";
++import { X } from "lucide-react";
++import { Button } from "@/components/ui/button";
++import { Input } from "@/components/ui/input";
++import { Textarea } from "@/components/ui/textarea";
++import { toast } from "sonner";
++import { base44 } from "@/api/base44Client";
++
++/**
++ * Modal for creating a new ServiceRequest. Owns the deal title, party
++ * picker search, and notes state. On successful create, calls
++ * `onRequestCreated(newRequest)` so the parent can select it and close
++ * the modal.
++ *
++ * Props:
++ *   open               - boolean, controls visibility
++ *   onClose            - () => void, close without creating
++ *   counterparties     - array of User records this user can make a
++ *                        request with. Caller is responsible for
++ *                        pre-filtering: TCs see investors, investors
++ *                        see TCs, admins see all approved members.
++ *   currentUser        - for attribution on the new request
++ *   onRequestCreated   - (request) => void, fires after successful create
++ */
++export default function NewRequestModal({
++  open,
++  onClose,
++  counterparties,
++  currentUser,
++  onRequestCreated,
++}) {
++  const queryClient = useQueryClient();
++  const [dealTitle, setDealTitle] = useState("");
++  const [notes, setNotes] = useState("");
++  const [userSearch, setUserSearch] = useState("");
++  const [selectedParty, setSelectedParty] = useState(null);
++  const [saving, setSaving] = useState(false);
++
++  const filteredCounterparties = useMemo(() => {
++    const q = userSearch.toLowerCase();
++    return counterparties.filter(u =>
++      u.full_name?.toLowerCase().includes(q) ||
++      u.email?.toLowerCase().includes(q)
++    );
++  }, [counterparties, userSearch]);
++
++  const reset = () => {
++    setDealTitle("");
++    setNotes("");
++    setUserSearch("");
++    setSelectedParty(null);
++  };
++
++  const handleClose = () => {
++    reset();
++    onClose();
++  };
++
++  const handleCreate = async () => {
++    if (!dealTitle.trim() || !selectedParty || !currentUser) return;
++    setSaving(true);
++    const isTC = currentUser.role === "tc";
++    try {
++      const req = await base44.entities.ServiceRequest.create({
++        deal_title: dealTitle.trim(),
++        tc_id: isTC ? currentUser.id : selectedParty.id,
++        tc_name: isTC ? currentUser.full_name : selectedParty.full_name,
++        investor_id: isTC ? selectedParty.id : currentUser.id,
++        investor_name: isTC ? selectedParty.full_name : currentUser.full_name,
++        status: "requested",
++        requested_at: new Date().toISOString(),
++        notes: notes.trim(),
++        comments: [],
++        documents: [],
++      });
++      queryClient.invalidateQueries({ queryKey: ['ServiceRequest'] });
++      onRequestCreated?.(req);
++      reset();
++    } catch {
++      toast.error("Failed to create request. Please try again.");
++    } finally {
++      setSaving(false);
++    }
++  };
++
++  if (!open) return null;
++
++  const counterpartyLabel = currentUser?.role === "tc"
++    ? "Investor / Agent"
++    : "Transaction Coordinator";
++
++  return (
++    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
++      <div className="bg-card rounded-2xl p-6 w-full max-w-md border border-border shadow-xl">
++        <div className="flex items-center justify-between mb-5">
++          <h3 className="font-bold text-navy text-lg">New Service Request</h3>
++          <button onClick={handleClose} aria-label="Close">
++            <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
++          </button>
++        </div>
++        <div className="space-y-4">
++          <div>
++            <label className="text-sm font-semibold text-navy mb-1.5 block">Deal Title</label>
++            <Input
++              value={dealTitle}
++              onChange={e => setDealTitle(e.target.value)}
++              placeholder="e.g. 123 Main St Fix & Flip"
++            />
++          </div>
++          <div>
++            <label className="text-sm font-semibold text-navy mb-1.5 block">
++              {counterpartyLabel}
++            </label>
++            <Input
++              value={userSearch}
++              onChange={e => { setUserSearch(e.target.value); setSelectedParty(null); }}
++              placeholder="Search by name or email…"
++            />
++            {userSearch && !selectedParty && (
++              <div className="mt-1 border border-border rounded-xl overflow-hidden max-h-36 overflow-y-auto shadow-sm">
++                {filteredCounterparties.slice(0, 6).map(u => (
++                  <button
++                    key={u.id}
++                    onClick={() => { setSelectedParty(u); setUserSearch(u.full_name); }}
++                    className="w-full text-left px-3 py-2.5 hover:bg-muted text-sm flex items-center gap-2.5 border-b border-border/50 last:border-0"
++                  >
++                    <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
++                      {u.full_name?.[0] || "?"}
++                    </div>
++                    <div>
++                      <p className="font-medium text-navy leading-tight">{u.full_name}</p>
++                      <p className="text-xs text-muted-foreground">{u.email}</p>
++                    </div>
++                  </button>
++                ))}
++                {filteredCounterparties.length === 0 && (
++                  <p className="text-sm text-muted-foreground px-3 py-3">No users found</p>
++                )}
++              </div>
++            )}
++          </div>
++          <div>
++            <label className="text-sm font-semibold text-navy mb-1.5 block">Notes (optional)</label>
++            <Textarea
++              value={notes}
++              onChange={e => setNotes(e.target.value)}
++              placeholder="Any details about this request…"
++              rows={3}
++            />
++          </div>
++          <div className="flex gap-2 pt-1">
++            <Button variant="outline" className="flex-1" onClick={handleClose}>
++              Cancel
++            </Button>
++            <button
++              className="flex-1 gradient-primary text-white font-semibold py-2 rounded-lg disabled:opacity-40 hover:opacity-90 transition-opacity"
++              onClick={handleCreate}
++              disabled={!dealTitle.trim() || !selectedParty || saving}
++            >
++              {saving ? "Creating…" : "Create Request"}
++            </button>
++          </div>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/components/service-requests/ProgressStepper.jsx b/src/components/service-requests/ProgressStepper.jsx
+new file mode 100644
+index 0000000..e5a72af
+--- /dev/null
++++ b/src/components/service-requests/ProgressStepper.jsx
+@@ -0,0 +1,51 @@
++import { cn } from "@/lib/utils";
++import { STAGES } from "@/lib/serviceRequestUtils";
++
++/**
++ * Horizontal stage indicator for a ServiceRequest's status lifecycle.
++ * Renders: Requested → Accepted → In Progress → Completed
++ *
++ * Props:
++ *   status - current status key (one of STAGES keys)
++ */
++export default function ProgressStepper({ status }) {
++  const currentIdx = STAGES.findIndex(s => s.key === status);
++  return (
++    <div className="flex items-center w-full py-4">
++      {STAGES.map((stage, i) => {
++        const Icon = stage.icon;
++        const done = i <= currentIdx;
++        const current = i === currentIdx;
++        return (
++          <div key={stage.key} className="flex items-center flex-1 last:flex-none">
++            <div className="flex flex-col items-center">
++              <div className={cn(
++                "w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all",
++                done
++                  ? "border-transparent text-white"
++                  : "border-border text-muted-foreground bg-background"
++              )}
++                style={done ? { background: "linear-gradient(135deg, hsl(168 100% 45%), hsl(196 100% 50%))" } : {}}
++              >
++                <Icon className={cn("w-4 h-4", current && !done && "animate-spin")} />
++              </div>
++              <span className={cn(
++                "text-xs mt-1 font-medium whitespace-nowrap",
++                done ? "text-teal" : "text-muted-foreground"
++              )}>
++                {stage.label}
++              </span>
++            </div>
++            {i < STAGES.length - 1 && (
++              <div className="flex-1 h-0.5 mx-2 rounded-full"
++                style={i < currentIdx
++                  ? { background: "linear-gradient(90deg, hsl(168 100% 45%), hsl(196 100% 50%))" }
++                  : { background: "hsl(var(--border))" }}
++              />
++            )}
++          </div>
++        );
++      })}
++    </div>
++  );
++}
+diff --git a/src/components/service-requests/RequestDetail.jsx b/src/components/service-requests/RequestDetail.jsx
+new file mode 100644
+index 0000000..9729f8c
+--- /dev/null
++++ b/src/components/service-requests/RequestDetail.jsx
+@@ -0,0 +1,160 @@
++import { useState } from "react";
++import { useQueryClient } from "@tanstack/react-query";
++import { FileText, ChevronLeft } from "lucide-react";
++import { cn } from "@/lib/utils";
++import { toast } from "sonner";
++import { base44 } from "@/api/base44Client";
++import {
++  STAGES,
++  STATUS_NEXT,
++  STATUS_COLORS,
++  formatRequestDate,
++  canAdvanceStatus,
++} from "@/lib/serviceRequestUtils";
++import ProgressStepper from "./ProgressStepper";
++import DocumentsSection from "./DocumentsSection";
++import CommentsSection from "./CommentsSection";
++
++/**
++ * Detail pane for a single ServiceRequest. Header, progress stepper,
++ * timestamps grid, notes, documents, comments. Owns the advanceStatus
++ * mutation (scalar write — no race).
++ *
++ * Props:
++ *   request         - currently-selected ServiceRequest, or null for empty state
++ *   currentUser     - current user (for role-gated UI and attribution)
++ *   onBackMobile    - () => void, mobile back button handler
++ *   onRequestUpdated - (updatedRequest) => void, called after any successful
++ *                      mutation on this request so the parent can sync its
++ *                      selected reference (keeps the detail pane in sync
++ *                      without a round-trip through the list refetch)
++ */
++export default function RequestDetail({
++  request,
++  currentUser,
++  onBackMobile,
++  onRequestUpdated,
++}) {
++  const queryClient = useQueryClient();
++  const [saving, setSaving] = useState(false);
++
++  if (!request) {
++    return (
++      <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
++        <FileText className="w-16 h-16 text-muted-foreground/20 mb-4" />
++        <p className="text-muted-foreground font-medium">Select a request to view details</p>
++      </div>
++    );
++  }
++
++  const canAdvance = canAdvanceStatus(currentUser?.role);
++  const nextStatus = STATUS_NEXT[request.status];
++
++  const handleAdvance = async () => {
++    if (!nextStatus) return;
++    const now = new Date().toISOString();
++    const timestamps = {
++      accepted: { accepted_at: now },
++      in_progress: { in_progress_at: now },
++      completed: { completed_at: now },
++    };
++    setSaving(true);
++    try {
++      // advanceStatus writes only scalar fields (status + one timestamp).
++      // No read-modify-write on arrays, so no race — doesn't need the
++      // refetch-before-write pattern used by DocumentsSection/CommentsSection.
++      const updated = await base44.entities.ServiceRequest.update(request.id, {
++        status: nextStatus,
++        ...timestamps[nextStatus],
++      });
++      onRequestUpdated?.(updated);
++      queryClient.invalidateQueries({ queryKey: ['ServiceRequest'] });
++    } catch {
++      toast.error("Failed to update status. Please try again.");
++    } finally {
++      setSaving(false);
++    }
++  };
++
++  return (
++    <div className="flex-1 overflow-y-auto">
++      {/* Header */}
++      <div className="px-6 pt-4 pb-2 border-b border-border sticky top-0 bg-card z-10">
++        <div className="flex items-center gap-3 mb-2">
++          <button
++            onClick={onBackMobile}
++            className="md:hidden p-1 rounded text-muted-foreground hover:text-foreground"
++            aria-label="Back to request list"
++          >
++            <ChevronLeft className="w-5 h-5" />
++          </button>
++          <h3 className="font-bold text-navy text-lg flex-1">
++            {request.deal_title || "Untitled Request"}
++          </h3>
++          <span className={cn(
++            "text-xs font-semibold px-3 py-1 rounded-full capitalize",
++            STATUS_COLORS[request.status]
++          )}>
++            {request.status?.replace("_", " ")}
++          </span>
++        </div>
++        <div className="text-xs text-muted-foreground flex gap-4 mb-2">
++          <span>TC: <span className="font-medium text-navy">{request.tc_name}</span></span>
++          <span>Investor: <span className="font-medium text-navy">{request.investor_name}</span></span>
++        </div>
++        <ProgressStepper status={request.status} />
++        {canAdvance && nextStatus && (
++          <div className="pb-3">
++            <button
++              onClick={handleAdvance}
++              disabled={saving}
++              className="gradient-primary text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
++            >
++              {saving ? "Updating…" : `Mark as ${nextStatus?.replace("_", " ")}`}
++            </button>
++          </div>
++        )}
++      </div>
++
++      <div className="p-6 space-y-6">
++        {/* Timestamps */}
++        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
++          {STAGES.map(stage => {
++            const tsField = `${stage.key}_at`;
++            const ts = stage.key === "requested" ? request.requested_at : request[tsField];
++            return (
++              <div key={stage.key} className="bg-muted/40 rounded-xl p-3">
++                <p className="text-xs text-muted-foreground font-medium">{stage.label}</p>
++                <p className="text-xs text-navy font-semibold mt-1">
++                  {ts ? formatRequestDate(ts) : "—"}
++                </p>
++              </div>
++            );
++          })}
++        </div>
++
++        {/* Notes */}
++        {request.notes && (
++          <div>
++            <h4 className="font-bold text-navy mb-2 text-sm">Notes</h4>
++            <p className="text-sm text-muted-foreground bg-muted/30 rounded-xl p-4">
++              {request.notes}
++            </p>
++          </div>
++        )}
++
++        <DocumentsSection
++          request={request}
++          currentUser={currentUser}
++          onUpdated={onRequestUpdated}
++        />
++
++        <CommentsSection
++          request={request}
++          currentUser={currentUser}
++          onUpdated={onRequestUpdated}
++        />
++      </div>
++    </div>
++  );
++}
+diff --git a/src/components/service-requests/RequestList.jsx b/src/components/service-requests/RequestList.jsx
+new file mode 100644
+index 0000000..2965eda
+--- /dev/null
++++ b/src/components/service-requests/RequestList.jsx
+@@ -0,0 +1,88 @@
++import { Plus, FileText } from "lucide-react";
++import { cn } from "@/lib/utils";
++import {
++  STATUS_COLORS,
++  formatRequestDate,
++} from "@/lib/serviceRequestUtils";
++
++/**
++ * Sidebar list of ServiceRequests. Pure presentation — all data and
++ * handlers come from props.
++ *
++ * Props:
++ *   requests            - array of ServiceRequest records, already filtered
++ *                         for the current user
++ *   currentUserRole     - "tc" | "investor" | "admin" (controls "new" button
++ *                         visibility — admins don't create requests)
++ *   selectedRequestId   - id of the currently-open request (for highlight)
++ *   onSelectRequest     - (request) => void
++ *   onNewRequest        - () => void, opens the new-request modal
++ *   className           - optional extra classes for the root element
++ */
++export default function RequestList({
++  requests,
++  currentUserRole,
++  selectedRequestId,
++  onSelectRequest,
++  onNewRequest,
++  className,
++}) {
++  const canCreate = currentUserRole && currentUserRole !== "admin";
++
++  return (
++    <div className={cn("flex flex-col h-full", className)}>
++      <div className="p-4 border-b border-border flex items-center justify-between">
++        <h2 className="font-bold text-navy text-lg">Service Requests</h2>
++        {canCreate && (
++          <button
++            onClick={onNewRequest}
++            className="gradient-primary text-white p-1.5 rounded-lg hover:opacity-90 transition-opacity"
++            aria-label="Create a new service request"
++          >
++            <Plus className="w-4 h-4" />
++          </button>
++        )}
++      </div>
++
++      <div className="flex-1 overflow-y-auto">
++        {requests.length === 0 && (
++          <div className="flex flex-col items-center justify-center h-full text-center p-6">
++            <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
++            <p className="text-sm text-muted-foreground">No service requests yet</p>
++            {canCreate && (
++              <p className="text-xs text-muted-foreground mt-1">Click + to create one</p>
++            )}
++          </div>
++        )}
++        {requests.map(req => (
++          <button
++            key={req.id}
++            onClick={() => onSelectRequest(req)}
++            className={cn(
++              "w-full text-left px-4 py-3 border-b border-border/50 hover:bg-muted/50 transition-colors",
++              selectedRequestId === req.id && "bg-teal/5 border-l-2 border-l-teal"
++            )}
++          >
++            <div className="flex items-start justify-between gap-2">
++              <div className="flex-1 min-w-0">
++                <p className="text-sm font-semibold text-navy truncate">{req.deal_title || "Untitled Request"}</p>
++                <p className="text-xs text-muted-foreground mt-0.5 truncate">
++                  TC: {req.tc_name} · Investor: {req.investor_name}
++                </p>
++                <span className={cn(
++                  "inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1.5 capitalize",
++                  STATUS_COLORS[req.status]
++                )}>
++                  {req.status?.replace("_", " ")}
++                </span>
++              </div>
++              <span className="text-xs text-muted-foreground flex-shrink-0">
++                {formatRequestDate(req.created_date)}
++              </span>
++            </div>
++          </button>
++        ))}
++      </div>
++    </div>
++  );
++}
+diff --git a/src/lib/serviceRequestUtils.js b/src/lib/serviceRequestUtils.js
+new file mode 100644
+index 0000000..932b61b
+--- /dev/null
++++ b/src/lib/serviceRequestUtils.js
+@@ -0,0 +1,52 @@
++import { format } from "date-fns";
++import { Clock, CheckCircle2, Loader2, Award } from "lucide-react";
++
++export const STAGES = [
++  { key: "requested", label: "Requested", icon: Clock },
++  { key: "accepted", label: "Accepted", icon: CheckCircle2 },
++  { key: "in_progress", label: "In Progress", icon: Loader2 },
++  { key: "completed", label: "Completed", icon: Award },
++];
++
++export const STATUS_NEXT = {
++  requested: "accepted",
++  accepted: "in_progress",
++  in_progress: "completed",
++};
++
++export const STATUS_COLORS = {
++  requested: "text-amber-600 bg-amber-50",
++  accepted: "text-teal bg-teal/10",
++  in_progress: "text-cyan bg-cyan/10",
++  completed: "text-green-600 bg-green-50",
++};
++
++export const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
++
++export const ALLOWED_FILE_TYPES = [
++  "application/pdf",
++  "image/jpeg",
++  "image/png",
++  "image/gif",
++  "application/msword",
++  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
++  "application/vnd.ms-excel",
++  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
++];
++
++/**
++ * Format a ServiceRequest timestamp: "MMM d, h:mm a". Returns "" on invalid input.
++ */
++export function formatRequestDate(d) {
++  if (!d) return "";
++  try { return format(new Date(d), "MMM d, h:mm a"); } catch { return ""; }
++}
++
++/**
++ * Can this user advance the status of a ServiceRequest?
++ * Only TCs and admins can advance status. Investors are read-only on the
++ * stepper.
++ */
++export function canAdvanceStatus(userRole) {
++  return userRole === "tc" || userRole === "admin";
++}
+diff --git a/src/pages/ServiceRequests.jsx b/src/pages/ServiceRequests.jsx
+index 7722600..76c112d 100644
+--- a/src/pages/ServiceRequests.jsx
++++ b/src/pages/ServiceRequests.jsx
+@@ -1,532 +1,130 @@
+-import { useState, useEffect, useRef } from "react";
++import { useState, useMemo } from "react";
++import { useQuery } from "@tanstack/react-query";
+ import { base44 } from "@/api/base44Client";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
+-import {
+-  Plus, X, FileText, Upload, CheckCircle2, Clock, Loader2, Award, ChevronLeft, Send
+-} from "lucide-react";
+-import { Button } from "@/components/ui/button";
+-import { Input } from "@/components/ui/input";
+-import { Textarea } from "@/components/ui/textarea";
+ import { cn } from "@/lib/utils";
+-import { format } from "date-fns";
+-import { toast } from "sonner";
+-
+-const STAGES = [
+-  { key: "requested", label: "Requested", icon: Clock },
+-  { key: "accepted", label: "Accepted", icon: CheckCircle2 },
+-  { key: "in_progress", label: "In Progress", icon: Loader2 },
+-  { key: "completed", label: "Completed", icon: Award },
+-];
+-
+-const STATUS_NEXT = {
+-  requested: "accepted",
+-  accepted: "in_progress",
+-  in_progress: "completed",
+-};
+-
+-const STATUS_COLORS = {
+-  requested: "text-amber-600 bg-amber-50",
+-  accepted: "text-teal bg-teal/10",
+-  in_progress: "text-cyan bg-cyan/10",
+-  completed: "text-green-600 bg-green-50",
+-};
+-
+-function ProgressStepper({ status }) {
+-  const currentIdx = STAGES.findIndex(s => s.key === status);
+-  return (
+-    <div className="flex items-center w-full py-4">
+-      {STAGES.map((stage, i) => {
+-        const Icon = stage.icon;
+-        const done = i <= currentIdx;
+-        const current = i === currentIdx;
+-        return (
+-          <div key={stage.key} className="flex items-center flex-1 last:flex-none">
+-            <div className="flex flex-col items-center">
+-              <div className={cn(
+-                "w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all",
+-                done
+-                  ? "border-transparent text-white"
+-                  : "border-border text-muted-foreground bg-background"
+-              )}
+-                style={done ? { background: "linear-gradient(135deg, hsl(168 100% 45%), hsl(196 100% 50%))" } : {}}
+-              >
+-                <Icon className={cn("w-4 h-4", current && !done && "animate-spin")} />
+-              </div>
+-              <span className={cn("text-xs mt-1 font-medium whitespace-nowrap", done ? "text-teal" : "text-muted-foreground")}>
+-                {stage.label}
+-              </span>
+-            </div>
+-            {i < STAGES.length - 1 && (
+-              <div className="flex-1 h-0.5 mx-2 rounded-full"
+-                style={i < currentIdx
+-                  ? { background: "linear-gradient(90deg, hsl(168 100% 45%), hsl(196 100% 50%))" }
+-                  : { background: "hsl(var(--border))" }}
+-              />
+-            )}
+-          </div>
+-        );
+-      })}
+-    </div>
+-  );
+-}
+ 
++import RequestList from "@/components/service-requests/RequestList";
++import RequestDetail from "@/components/service-requests/RequestDetail";
++import NewRequestModal from "@/components/service-requests/NewRequestModal";
++
++/**
++ * ServiceRequests page — thin orchestrator composing three focused
++ * components:
++ *   - RequestList      (sidebar)
++ *   - RequestDetail    (detail pane, composes DocumentsSection + CommentsSection)
++ *   - NewRequestModal  (create flow)
++ *
++ * This component holds only the top-level coordination state:
++ *   - which request is selected
++ *   - whether the mobile detail pane is showing
++ *   - whether the new-request modal is open
++ *
++ * Data flow:
++ *   - Two useQuery calls (ServiceRequest list, role-scoped counterparty User list)
++ *   - Children mutate via base44 SDK and invalidate ['ServiceRequest'] to
++ *     refresh this list. onRequestUpdated callback from detail pane also
++ *     syncs the `selected` reference so the detail view updates without
++ *     waiting for the list refetch.
++ */
+ export default function ServiceRequests() {
+   const { data: user } = useCurrentUser();
+-  const [requests, setRequests] = useState([]);
+   const [selected, setSelected] = useState(null);
+   const [showMobileDetail, setShowMobileDetail] = useState(false);
+   const [showNew, setShowNew] = useState(false);
+-  const [allUsers, setAllUsers] = useState([]);
+-  const [userSearch, setUserSearch] = useState("");
+-  const [selectedParty, setSelectedParty] = useState(null);
+-  const [newDealTitle, setNewDealTitle] = useState("");
+-  const [newNotes, setNewNotes] = useState("");
+-  const [newComment, setNewComment] = useState("");
+-  const [uploading, setUploading] = useState(false);
+-  const [saving, setSaving] = useState(false);
+-  const fileInputRef = useRef(null);
+-
+-  // Load dependents once the user resolves.
+-  useEffect(() => {
+-    if (!user) return;
+-    (async () => {
+-      // Service requests are always between an investor and a TC.
+-      // Scope the counterparty picker to the OPPOSITE role so we don't
+-      // pull the full user table — e.g., a TC only needs to see investors.
+-      // Admins can pick anyone approved (fallback to approved-status filter).
+-      let counterparties = [];
+-      try {
+-        if (user.role === "tc") {
+-          counterparties = await base44.entities.User.filter({ role: "investor" });
+-        } else if (user.role === "investor") {
+-          counterparties = await base44.entities.User.filter({ role: "tc" });
+-        } else {
+-          // admin or other: show approved members only
+-          counterparties = await base44.entities.User.filter({ member_status: "approved" });
+-        }
+-      } catch {}
+-      setAllUsers(counterparties.filter(usr => usr.id !== user.id));
+-      await loadRequests(user);
+-    })();
+-    // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, [user?.id]);
+ 
+-  const loadRequests = async (u) => {
+-    const u_ = u || user;
+-    if (!u_) return;
+-    const all = await base44.entities.ServiceRequest.list('-created_date', 200);
+-    const mine = u_.role === "admin"
+-      ? all
+-      : all.filter(r => r.tc_id === u_.id || r.investor_id === u_.id);
+-    setRequests(mine);
+-  };
+-
+-  const advanceStatus = async () => {
+-    if (!selected || !STATUS_NEXT[selected.status]) return;
+-    const nextStatus = STATUS_NEXT[selected.status];
+-    const now = new Date().toISOString();
+-    const timestamps = {
+-      accepted: { accepted_at: now },
+-      in_progress: { in_progress_at: now },
+-      completed: { completed_at: now },
+-    };
+-    setSaving(true);
+-    try {
+-      const updated = await base44.entities.ServiceRequest.update(selected.id, {
+-        status: nextStatus,
+-        ...timestamps[nextStatus],
+-      });
+-      setSelected(updated);
+-      await loadRequests();
+-    } catch (e) {
+-      toast.error("Failed to update status. Please try again.");
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
++  // All service requests. Role-scoped filter applied client-side because
++  // Base44's single-key filter can't express "tc_id = X OR investor_id = X"
++  // — we have to fetch and filter.
++  const { data: allRequests = [] } = useQuery({
++    queryKey: ['ServiceRequest', 'list', { sort: '-created_date', limit: 200 }],
++    queryFn: () => base44.entities.ServiceRequest.list('-created_date', 200),
++    enabled: !!user?.id,
++  });
++
++  const requests = useMemo(() => {
++    if (!user) return [];
++    if (user.role === "admin") return allRequests;
++    return allRequests.filter(r => r.tc_id === user.id || r.investor_id === user.id);
++  }, [allRequests, user]);
++
++  // Counterparties for the new-request modal. Role-scoped server-side
++  // (from T2.3): TCs see investors, investors see TCs, admins see all
++  // approved members.
++  //
++  // The queryKey includes the user's role so the cache key changes when
++  // the role does (e.g., after an admin-initiated role change). Without
++  // this, a role change wouldn't flip the visible counterparty list until
++  // a manual invalidation.
++  const counterpartyFilter = useMemo(() => {
++    if (user?.role === "tc") return { role: "investor" };
++    if (user?.role === "investor") return { role: "tc" };
++    return { member_status: "approved" };
++  }, [user?.role]);
++
++  const { data: allCounterparties = [] } = useQuery({
++    queryKey: ['User', counterpartyFilter],
++    queryFn: () => base44.entities.User.filter(counterpartyFilter),
++    enabled: !!user?.id,
++  });
++
++  const counterparties = useMemo(
++    () => (user ? allCounterparties.filter(u => u.id !== user.id) : []),
++    [allCounterparties, user]
++  );
+ 
+-  const addComment = async () => {
+-    if (!newComment.trim() || !selected) return;
+-    const comment = {
+-      author_id: user.id,
+-      author_name: user.full_name,
+-      content: newComment.trim(),
+-      timestamp: new Date().toISOString(),
+-    };
+-    try {
+-      // Refetch the fresh record before appending to avoid clobbering a
+-      // concurrent comment/document from the other party. See T2.5 in the
+-      // audit: comments and documents are arrays embedded on the
+-      // ServiceRequest entity, so a stale read + write pattern would
+-      // silently lose the other side's additions. This shrinks the race
+-      // window to the round-trip between filter() and update().
+-      //
+-      // Long-term fix: separate Comment entity keyed by request_id (T2.5
+-      // proper fix, not in scope for this PR).
+-      const fresh = (await base44.entities.ServiceRequest.filter({ id: selected.id }))[0];
+-      if (!fresh) {
+-        toast.error("This request could not be found. It may have been deleted.");
+-        return;
+-      }
+-      const updated = await base44.entities.ServiceRequest.update(selected.id, {
+-        comments: [...(fresh.comments || []), comment],
+-      });
+-      setSelected(updated);
+-      setNewComment("");
+-      await loadRequests();
+-    } catch (e) {
+-      toast.error("Failed to post comment. Please try again.");
+-    }
++  const handleSelectRequest = (request) => {
++    setSelected(request);
++    setShowMobileDetail(true);
+   };
+ 
+-  const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+-  const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/gif", "application/msword",
+-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+-    "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"];
+-
+-  const uploadDocument = async (e) => {
+-    const file = e.target.files[0];
+-    if (!file || !selected) return;
+-
+-    if (file.size > MAX_FILE_SIZE) {
+-      toast.error("File is too large. Maximum size is 25 MB.");
+-      e.target.value = '';
+-      return;
+-    }
+-    if (!ALLOWED_TYPES.includes(file.type)) {
+-      toast.error("File type not allowed. Please upload a PDF, image, Word, or Excel file.");
+-      e.target.value = '';
+-      return;
+-    }
+-
+-    setUploading(true);
+-    try {
+-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+-      const doc = {
+-        name: file.name,
+-        url: file_url,
+-        uploaded_by: user.full_name,
+-        uploaded_at: new Date().toISOString(),
+-      };
+-      // Refetch the fresh record before appending to avoid clobbering a
+-      // concurrent document/comment from the other party. Same pattern +
+-      // rationale as addComment — T2.5 quick fix.
+-      const fresh = (await base44.entities.ServiceRequest.filter({ id: selected.id }))[0];
+-      if (!fresh) {
+-        toast.error("This request could not be found. It may have been deleted.");
+-        return;
+-      }
+-      const updated = await base44.entities.ServiceRequest.update(selected.id, {
+-        documents: [...(fresh.documents || []), doc],
+-      });
+-      setSelected(updated);
+-      await loadRequests();
+-    } catch (e) {
+-      toast.error("Upload failed. Please try again.");
+-    } finally {
+-      setUploading(false);
+-      e.target.value = '';
+-    }
++  // When a child component mutates the selected request (advanceStatus,
++  // addComment, uploadDocument), it returns the updated record — we sync
++  // `selected` so the detail pane reflects the change immediately without
++  // waiting for the list query to refetch.
++  const handleRequestUpdated = (updatedRequest) => {
++    setSelected(updatedRequest);
+   };
+ 
+-  const createRequest = async () => {
+-    if (!newDealTitle.trim() || !selectedParty) return;
+-    setSaving(true);
+-    const isTC = user?.role === "tc";
+-    const req = await base44.entities.ServiceRequest.create({
+-      deal_title: newDealTitle.trim(),
+-      tc_id: isTC ? user.id : selectedParty.id,
+-      tc_name: isTC ? user.full_name : selectedParty.full_name,
+-      investor_id: isTC ? selectedParty.id : user.id,
+-      investor_name: isTC ? selectedParty.full_name : user.full_name,
+-      status: "requested",
+-      requested_at: new Date().toISOString(),
+-      notes: newNotes.trim(),
+-      comments: [],
+-      documents: [],
+-    });
++  const handleRequestCreated = (request) => {
+     setShowNew(false);
+-    setNewDealTitle("");
+-    setNewNotes("");
+-    setSelectedParty(null);
+-    setUserSearch("");
+-    await loadRequests();
+-    setSelected(req);
++    setSelected(request);
+     setShowMobileDetail(true);
+-    setSaving(false);
+   };
+ 
+-  const filteredUsers = allUsers.filter(u =>
+-    u.full_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+-    u.email?.toLowerCase().includes(userSearch.toLowerCase())
+-  );
+-
+-  const formatDate = (d) => {
+-    if (!d) return "";
+-    try { return format(new Date(d), 'MMM d, h:mm a'); } catch { return ""; }
+-  };
+-
+-  const canAdvance = user?.role === "tc" || user?.role === "admin";
+-
+   return (
+     <div className="h-[calc(100vh-120px)] flex rounded-2xl border border-border overflow-hidden bg-card shadow-sm">
+-      {/* List Panel */}
++      <RequestList
++        requests={requests}
++        currentUserRole={user?.role}
++        selectedRequestId={selected?.id}
++        onSelectRequest={handleSelectRequest}
++        onNewRequest={() => setShowNew(true)}
++        className={cn(
++          "w-full md:w-80 lg:w-96 border-r border-border flex-shrink-0",
++          showMobileDetail && "hidden md:flex"
++        )}
++      />
++
+       <div className={cn(
+-        "w-full md:w-80 lg:w-96 border-r border-border flex flex-col flex-shrink-0",
+-        showMobileDetail && "hidden md:flex"
++        "flex-1 flex flex-col overflow-hidden",
++        !showMobileDetail && "hidden md:flex"
+       )}>
+-        <div className="p-4 border-b border-border flex items-center justify-between">
+-          <h2 className="font-bold text-navy text-lg">Service Requests</h2>
+-          {user?.role !== "admin" && (
+-            <button
+-              onClick={() => setShowNew(true)}
+-              className="gradient-primary text-white p-1.5 rounded-lg hover:opacity-90 transition-opacity"
+-            >
+-              <Plus className="w-4 h-4" />
+-            </button>
+-          )}
+-        </div>
+-
+-        <div className="flex-1 overflow-y-auto">
+-          {requests.length === 0 && (
+-            <div className="flex flex-col items-center justify-center h-full text-center p-6">
+-              <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
+-              <p className="text-sm text-muted-foreground">No service requests yet</p>
+-              {user?.role !== "admin" && (
+-                <p className="text-xs text-muted-foreground mt-1">Click + to create one</p>
+-              )}
+-            </div>
+-          )}
+-          {requests.map(req => (
+-            <button
+-              key={req.id}
+-              onClick={() => { setSelected(req); setShowMobileDetail(true); }}
+-              className={cn(
+-                "w-full text-left px-4 py-3 border-b border-border/50 hover:bg-muted/50 transition-colors",
+-                selected?.id === req.id && "bg-teal/5 border-l-2 border-l-teal"
+-              )}
+-            >
+-              <div className="flex items-start justify-between gap-2">
+-                <div className="flex-1 min-w-0">
+-                  <p className="text-sm font-semibold text-navy truncate">{req.deal_title || "Untitled Request"}</p>
+-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+-                    TC: {req.tc_name} · Investor: {req.investor_name}
+-                  </p>
+-                  <span className={cn("inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1.5 capitalize", STATUS_COLORS[req.status])}>
+-                    {req.status?.replace("_", " ")}
+-                  </span>
+-                </div>
+-                <span className="text-xs text-muted-foreground flex-shrink-0">{formatDate(req.created_date)}</span>
+-              </div>
+-            </button>
+-          ))}
+-        </div>
++        <RequestDetail
++          request={selected}
++          currentUser={user}
++          onBackMobile={() => setShowMobileDetail(false)}
++          onRequestUpdated={handleRequestUpdated}
++        />
+       </div>
+ 
+-      {/* Detail Panel */}
+-      <div className={cn("flex-1 flex flex-col overflow-hidden", !showMobileDetail && "hidden md:flex")}>
+-        {!selected ? (
+-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+-            <FileText className="w-16 h-16 text-muted-foreground/20 mb-4" />
+-            <p className="text-muted-foreground font-medium">Select a request to view details</p>
+-          </div>
+-        ) : (
+-          <div className="flex-1 overflow-y-auto">
+-            {/* Header */}
+-            <div className="px-6 pt-4 pb-2 border-b border-border sticky top-0 bg-card z-10">
+-              <div className="flex items-center gap-3 mb-2">
+-                <button onClick={() => setShowMobileDetail(false)} className="md:hidden p-1 rounded text-muted-foreground hover:text-foreground">
+-                  <ChevronLeft className="w-5 h-5" />
+-                </button>
+-                <h3 className="font-bold text-navy text-lg flex-1">{selected.deal_title || "Untitled Request"}</h3>
+-                <span className={cn("text-xs font-semibold px-3 py-1 rounded-full capitalize", STATUS_COLORS[selected.status])}>
+-                  {selected.status?.replace("_", " ")}
+-                </span>
+-              </div>
+-              <div className="text-xs text-muted-foreground flex gap-4 mb-2">
+-                <span>TC: <span className="font-medium text-navy">{selected.tc_name}</span></span>
+-                <span>Investor: <span className="font-medium text-navy">{selected.investor_name}</span></span>
+-              </div>
+-              <ProgressStepper status={selected.status} />
+-              {canAdvance && STATUS_NEXT[selected.status] && (
+-                <div className="pb-3">
+-                  <button
+-                    onClick={advanceStatus}
+-                    disabled={saving}
+-                    className="gradient-primary text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+-                  >
+-                    {saving ? "Updating…" : `Mark as ${STATUS_NEXT[selected.status]?.replace("_", " ")}`}
+-                  </button>
+-                </div>
+-              )}
+-            </div>
+-
+-            <div className="p-6 space-y-6">
+-              {/* Timestamps */}
+-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+-                {STAGES.map(stage => {
+-                  const tsField = `${stage.key}_at`;
+-                  const ts = stage.key === "requested" ? selected.requested_at : selected[tsField];
+-                  return (
+-                    <div key={stage.key} className="bg-muted/40 rounded-xl p-3">
+-                      <p className="text-xs text-muted-foreground font-medium">{stage.label}</p>
+-                      <p className="text-xs text-navy font-semibold mt-1">{ts ? formatDate(ts) : "—"}</p>
+-                    </div>
+-                  );
+-                })}
+-              </div>
+-
+-              {/* Notes */}
+-              {selected.notes && (
+-                <div>
+-                  <h4 className="font-bold text-navy mb-2 text-sm">Notes</h4>
+-                  <p className="text-sm text-muted-foreground bg-muted/30 rounded-xl p-4">{selected.notes}</p>
+-                </div>
+-              )}
+-
+-              {/* Documents */}
+-              <div>
+-                <div className="flex items-center justify-between mb-2">
+-                  <h4 className="font-bold text-navy text-sm">Documents</h4>
+-                  <div>
+-                    <input type="file" ref={fileInputRef} onChange={uploadDocument} className="hidden" />
+-                    <button
+-                      onClick={() => fileInputRef.current?.click()}
+-                      disabled={uploading}
+-                      className="flex items-center gap-1.5 text-xs text-teal font-semibold hover:opacity-80 transition-opacity"
+-                    >
+-                      <Upload className="w-3.5 h-3.5" />
+-                      {uploading ? "Uploading…" : "Upload"}
+-                    </button>
+-                  </div>
+-                </div>
+-                {(!selected.documents || selected.documents.length === 0) ? (
+-                  <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
+-                ) : (
+-                  <div className="space-y-2">
+-                    {selected.documents.map((doc, i) => (
+-                      <a key={i} href={doc.url} target="_blank" rel="noreferrer"
+-                        className="flex items-center gap-2 p-3 rounded-xl border border-border hover:border-teal/40 hover:bg-teal/5 transition-all group">
+-                        <FileText className="w-4 h-4 text-teal flex-shrink-0" />
+-                        <div className="flex-1 min-w-0">
+-                          <p className="text-sm font-medium text-navy truncate">{doc.name}</p>
+-                          <p className="text-xs text-muted-foreground">by {doc.uploaded_by} · {formatDate(doc.uploaded_at)}</p>
+-                        </div>
+-                      </a>
+-                    ))}
+-                  </div>
+-                )}
+-              </div>
+-
+-              {/* Comments */}
+-              <div>
+-                <h4 className="font-bold text-navy text-sm mb-3">Comments</h4>
+-                <div className="space-y-3 mb-4">
+-                  {(!selected.comments || selected.comments.length === 0) && (
+-                    <p className="text-sm text-muted-foreground">No comments yet.</p>
+-                  )}
+-                  {(selected.comments || []).map((c, i) => (
+-                    <div key={i} className={cn("flex", c.author_id === user?.id ? "justify-end" : "justify-start")}>
+-                      <div className={cn(
+-                        "max-w-[80%] rounded-2xl px-4 py-2.5",
+-                        c.author_id === user?.id ? "gradient-primary text-navy" : "bg-muted/60 text-foreground border border-border"
+-                      )}>
+-                        {c.author_id !== user?.id && (
+-                          <p className="text-xs font-semibold text-muted-foreground mb-1">{c.author_name}</p>
+-                        )}
+-                        <p className="text-sm">{c.content}</p>
+-                        <p className={cn("text-xs mt-1 text-right", c.author_id === user?.id ? "text-navy/60" : "text-muted-foreground")}>
+-                          {formatDate(c.timestamp)}
+-                        </p>
+-                      </div>
+-                    </div>
+-                  ))}
+-                </div>
+-                <div className="flex gap-2">
+-                  <Textarea
+-                    value={newComment}
+-                    onChange={e => setNewComment(e.target.value)}
+-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addComment(); } }}
+-                    placeholder="Add a comment…"
+-                    className="flex-1 min-h-[40px] max-h-[100px] resize-none text-sm"
+-                    rows={1}
+-                  />
+-                  <button
+-                    onClick={addComment}
+-                    disabled={!newComment.trim()}
+-                    className="gradient-primary text-white p-2.5 rounded-xl disabled:opacity-40 hover:opacity-90 transition-opacity flex-shrink-0"
+-                  >
+-                    <Send className="w-4 h-4" />
+-                  </button>
+-                </div>
+-              </div>
+-            </div>
+-          </div>
+-        )}
+-      </div>
+-
+-      {/* New Request Modal */}
+-      {showNew && (
+-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+-          <div className="bg-card rounded-2xl p-6 w-full max-w-md border border-border shadow-xl">
+-            <div className="flex items-center justify-between mb-5">
+-              <h3 className="font-bold text-navy text-lg">New Service Request</h3>
+-              <button onClick={() => { setShowNew(false); setSelectedParty(null); setUserSearch(""); setNewDealTitle(""); setNewNotes(""); }}>
+-                <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+-              </button>
+-            </div>
+-            <div className="space-y-4">
+-              <div>
+-                <label className="text-sm font-semibold text-navy mb-1.5 block">Deal Title</label>
+-                <Input value={newDealTitle} onChange={e => setNewDealTitle(e.target.value)} placeholder="e.g. 123 Main St Fix & Flip" />
+-              </div>
+-              <div>
+-                <label className="text-sm font-semibold text-navy mb-1.5 block">
+-                  {user?.role === "tc" ? "Investor / Agent" : "Transaction Coordinator"}
+-                </label>
+-                <Input
+-                  value={userSearch}
+-                  onChange={e => { setUserSearch(e.target.value); setSelectedParty(null); }}
+-                  placeholder="Search by name or email…"
+-                />
+-                {userSearch && !selectedParty && (
+-                  <div className="mt-1 border border-border rounded-xl overflow-hidden max-h-36 overflow-y-auto shadow-sm">
+-                    {filteredUsers.slice(0, 6).map(u => (
+-                      <button key={u.id} onClick={() => { setSelectedParty(u); setUserSearch(u.full_name); }}
+-                        className="w-full text-left px-3 py-2.5 hover:bg-muted text-sm flex items-center gap-2.5 border-b border-border/50 last:border-0">
+-                        <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+-                          {u.full_name?.[0] || "?"}
+-                        </div>
+-                        <div>
+-                          <p className="font-medium text-navy leading-tight">{u.full_name}</p>
+-                          <p className="text-xs text-muted-foreground">{u.email}</p>
+-                        </div>
+-                      </button>
+-                    ))}
+-                    {filteredUsers.length === 0 && <p className="text-sm text-muted-foreground px-3 py-3">No users found</p>}
+-                  </div>
+-                )}
+-              </div>
+-              <div>
+-                <label className="text-sm font-semibold text-navy mb-1.5 block">Notes (optional)</label>
+-                <Textarea value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Any details about this request…" rows={3} />
+-              </div>
+-              <div className="flex gap-2 pt-1">
+-                <Button variant="outline" className="flex-1" onClick={() => { setShowNew(false); setSelectedParty(null); setUserSearch(""); setNewDealTitle(""); setNewNotes(""); }}>
+-                  Cancel
+-                </Button>
+-                <button
+-                  className="flex-1 gradient-primary text-white font-semibold py-2 rounded-lg disabled:opacity-40 hover:opacity-90 transition-opacity"
+-                  onClick={createRequest}
+-                  disabled={!newDealTitle.trim() || !selectedParty || saving}
+-                >
+-                  {saving ? "Creating…" : "Create Request"}
+-                </button>
+-              </div>
+-            </div>
+-          </div>
+-        </div>
+-      )}
++      <NewRequestModal
++        open={showNew}
++        onClose={() => setShowNew(false)}
++        counterparties={counterparties}
++        currentUser={user}
++        onRequestCreated={handleRequestCreated}
++      />
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+-- 
+2.43.0
+
