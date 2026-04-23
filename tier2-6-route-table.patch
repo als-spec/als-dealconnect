@@ -1,0 +1,302 @@
+From ecfc2595e310c1e3a07a89c0d5ff04dd9f399aa3 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Thu, 23 Apr 2026 13:18:58 +0000
+Subject: [PATCH] T2.6: Extract route table into declarative data module
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Refactors App.jsx's role-gated routes from four duplicated JSX blocks
+into a declarative table driven by role filters.
+
+Before:
+  Four per-role JSX blocks (admin/tc/investor/pml) each declared 8-11
+  <Route> entries. Heavy duplication: /tc-directory, /investor-directory,
+  /pml-directory, /messages, /support etc. repeated across 3-4 blocks.
+  Permission matrix only readable by scanning all four blocks side by
+  side. Adding a new route to all roles required touching the same
+  JSX in multiple places.
+
+After:
+  src/lib/routes.jsx exports AUTHENTICATED_ROUTES as a single ordered
+  array of { path, roles, element } entries. Shared routes use a roles
+  array with multiple values; /profile entries (which resolve to
+  different components per role) are listed once per role with the
+  same path but different element.
+
+  App.jsx renders userRoutes = routesForRole(user.role) as a simple
+  .map() inside the Layout <Route>. One canonical source of truth for
+  the permission matrix.
+
+Line counts:
+  src/App.jsx      180 -> 107 lines (-40%)
+  src/lib/routes.jsx  +105 lines (new)
+
+Behavior preservation (verified before committing):
+Extracted each role's original route list from App.jsx and diffed
+against what routesForRole() returns for that role. All four roles
+match EXACTLY — admin, tc, investor, pml. No routes added, removed,
+or had their role access changed.
+
+Pre-existing quirks preserved as-is (flagged in routes.jsx comments):
+  - TC can access /profile/pml but not /profile/tc
+  - Admin has /profile/tc and /profile/pml but not /profile/investor
+These are preserved because the goal is a pure refactor, not a
+behavior change. Worth revisiting as a separate product decision.
+
+Files:
+  - src/App.jsx      (180 -> 107 lines)
+  - src/lib/routes.jsx  (new, 105 lines)
+
+Verification:
+  - npm run lint: 0 errors (full codebase)
+  - npm run build: succeeds
+  - Route parity: all 4 roles match exactly between old and new
+    implementation (verified via Python diff script)
+---
+ src/App.jsx        |  94 +++++-----------------------------------
+ src/lib/routes.jsx | 105 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 115 insertions(+), 84 deletions(-)
+ create mode 100644 src/lib/routes.jsx
+
+diff --git a/src/App.jsx b/src/App.jsx
+index ff1f25f..664ce6f 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -7,27 +7,12 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
+ import UserNotRegisteredError from "@/components/UserNotRegisteredError";
+ import { ErrorBoundary } from "@/components/ErrorBoundary";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
++import { routesForRole } from "@/lib/routes";
+ 
+ import Layout from "./components/Layout";
+ import Onboarding from "./pages/Onboarding";
+-import Dashboard from "./pages/Dashboard";
+-import Applications from "./pages/admin/Applications";
+-import Members from "./pages/admin/Members";
+-import ComingSoon from "./pages/ComingSoon";
+-import TCProfilePage from "./pages/TCProfilePage";
+-import InvestorProfilePage from "./pages/InvestorProfilePage";
+-import TCDirectory from "./pages/TCDirectory";
+-import PMLProfilePage from "./pages/PMLProfilePage";
+-import PMLDirectory from "./pages/PMLDirectory";
+-import DealBoard from "./pages/DealBoard";
+-import Messages from "./pages/Messages";
+-import ServiceRequests from "./pages/ServiceRequests";
+ import LandingPage from "./pages/LandingPage";
+ import PartnersPage from "./pages/PartnersPage";
+-import AdminPartners from "./pages/admin/Partners";
+-import InvestorDirectory from "./pages/InvestorDirectory";
+-import SupportTickets from "./pages/SupportTickets";
+-import AdminSupportTickets from "./pages/admin/SupportTickets";
+ 
+ const AuthenticatedApp = () => {
+   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+@@ -84,78 +69,19 @@ const AuthenticatedApp = () => {
+     );
+   }
+ 
++  // Role-scoped authenticated routes — see src/lib/routes.jsx for the
++  // permission matrix. routesForRole returns only the entries visible to
++  // the current user's role.
++  const userRoutes = routesForRole(user?.role);
++
+   return (
+     <Routes>
+       <Route path="/" element={<LandingPage user={user} />} />
+       <Route path="/partners" element={<PartnersPage user={user} />} />
+       <Route element={<Layout user={user} />}>
+-        <Route path="/dashboard" element={<Dashboard />} />
+-
+-        {/* Admin routes */}
+-        {user?.role === "admin" && (
+-          <>
+-            <Route path="/admin/applications" element={<Applications />} />
+-            <Route path="/admin/members" element={<Members />} />
+-            <Route path="/admin/partners" element={<AdminPartners />} />
+-            <Route path="/admin/support" element={<AdminSupportTickets />} />
+-            <Route path="/service-requests" element={<ServiceRequests />} />
+-            <Route path="/settings" element={<ComingSoon title="Platform Settings" />} />
+-            <Route path="/profile/tc" element={<TCProfilePage />} />
+-            <Route path="/profile/pml" element={<PMLProfilePage />} />
+-            <Route path="/tc-directory" element={<TCDirectory />} />
+-            <Route path="/investor-directory" element={<InvestorDirectory />} />
+-            <Route path="/pml-directory" element={<PMLDirectory />} />
+-          </>
+-        )}
+-
+-        {/* TC routes */}
+-        {user?.role === "tc" && (
+-          <>
+-            <Route path="/deal-board" element={<DealBoard />} />
+-            <Route path="/messages" element={<Messages />} />
+-            <Route path="/service-requests" element={<ServiceRequests />} />
+-            <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
+-            <Route path="/support" element={<SupportTickets />} />
+-            <Route path="/profile" element={<TCProfilePage />} />
+-            <Route path="/tc-directory" element={<TCDirectory />} />
+-            <Route path="/investor-directory" element={<InvestorDirectory />} />
+-            <Route path="/pml-directory" element={<PMLDirectory />} />
+-            <Route path="/profile/pml" element={<PMLProfilePage />} />
+-          </>
+-        )}
+-
+-        {/* Investor routes */}
+-        {user?.role === "investor" && (
+-          <>
+-            <Route path="/deal-board" element={<DealBoard />} />
+-            <Route path="/tc-directory" element={<TCDirectory />} />
+-            <Route path="/investor-directory" element={<InvestorDirectory />} />
+-            <Route path="/pml-directory" element={<PMLDirectory />} />
+-            <Route path="/messages" element={<Messages />} />
+-            <Route path="/service-requests" element={<ServiceRequests />} />
+-            <Route path="/support" element={<SupportTickets />} />
+-            <Route path="/profile" element={<InvestorProfilePage />} />
+-            <Route path="/profile/tc" element={<TCProfilePage />} />
+-            <Route path="/profile/pml" element={<PMLProfilePage />} />
+-          </>
+-        )}
+-
+-        {/* PML routes */}
+-        {user?.role === "pml" && (
+-          <>
+-            <Route path="/pipeline" element={<ComingSoon title="Pipeline" />} />
+-            <Route path="/messages" element={<Messages />} />
+-            <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
+-            <Route path="/support" element={<SupportTickets />} />
+-            <Route path="/profile" element={<PMLProfilePage />} />
+-            <Route path="/tc-directory" element={<TCDirectory />} />
+-            <Route path="/investor-directory" element={<InvestorDirectory />} />
+-            <Route path="/pml-directory" element={<PMLDirectory />} />
+-            <Route path="/profile/tc" element={<TCProfilePage />} />
+-            <Route path="/profile/pml" element={<PMLProfilePage />} />
+-          </>
+-        )}
+-
++        {userRoutes.map(({ path, element }) => (
++          <Route key={path} path={path} element={element} />
++        ))}
+         <Route path="*" element={<PageNotFound />} />
+       </Route>
+       <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
+@@ -178,4 +104,4 @@ function App() {
+   );
+ }
+ 
+-export default App;
+\ No newline at end of file
++export default App;
+diff --git a/src/lib/routes.jsx b/src/lib/routes.jsx
+new file mode 100644
+index 0000000..90ceab9
+--- /dev/null
++++ b/src/lib/routes.jsx
+@@ -0,0 +1,105 @@
++// Route table for authenticated routes inside the Layout shell.
++//
++// Design goals:
++//   - Permission matrix (which roles can hit which paths) is readable at a glance
++//   - Zero per-role duplication — shared routes are declared once with a
++//     `roles` array
++//   - The same route + component can resolve different content per role
++//     (e.g., /profile is TCProfilePage for TCs, InvestorProfilePage for
++//     investors, PMLProfilePage for PMLs)
++//
++// Shape:
++//   { path: string, roles: ("admin"|"tc"|"investor"|"pml")[], element: ReactNode }
++//
++// App.jsx filters this table by the current user's role and emits a <Route>
++// for each matching entry, in order.
++//
++// Behavior preservation note (T2.6): this table was derived from a careful
++// read of the old per-role route blocks in App.jsx. Every route that existed
++// before still exists. No routes were added, removed, or had their role
++// access changed. A few pre-existing quirks (e.g., TC has /profile/pml but
++// not /profile/tc; admin has /profile/tc and /profile/pml but not
++// /profile/investor) are preserved exactly. Flagged in the PR body for
++// product consideration but deliberately not changed here.
++
++import Dashboard from "@/pages/Dashboard";
++import Applications from "@/pages/admin/Applications";
++import Members from "@/pages/admin/Members";
++import AdminPartners from "@/pages/admin/Partners";
++import AdminSupportTickets from "@/pages/admin/SupportTickets";
++import ComingSoon from "@/pages/ComingSoon";
++import TCProfilePage from "@/pages/TCProfilePage";
++import InvestorProfilePage from "@/pages/InvestorProfilePage";
++import PMLProfilePage from "@/pages/PMLProfilePage";
++import TCDirectory from "@/pages/TCDirectory";
++import InvestorDirectory from "@/pages/InvestorDirectory";
++import PMLDirectory from "@/pages/PMLDirectory";
++import DealBoard from "@/pages/DealBoard";
++import Messages from "@/pages/Messages";
++import ServiceRequests from "@/pages/ServiceRequests";
++import SupportTickets from "@/pages/SupportTickets";
++
++export const ALL_ROLES = ["admin", "tc", "investor", "pml"];
++
++/**
++ * Authenticated routes rendered inside <Layout>. Each entry is visible
++ * only to users whose role is in `roles`.
++ *
++ * Entries are ordered by domain: dashboard → admin-only → role-specific
++ * features → shared (directories, profile-by-role).
++ */
++export const AUTHENTICATED_ROUTES = [
++  // Everyone with a valid role gets the dashboard.
++  { path: "/dashboard", roles: ALL_ROLES, element: <Dashboard /> },
++
++  // Admin-only
++  { path: "/admin/applications", roles: ["admin"], element: <Applications /> },
++  { path: "/admin/members", roles: ["admin"], element: <Members /> },
++  { path: "/admin/partners", roles: ["admin"], element: <AdminPartners /> },
++  { path: "/admin/support", roles: ["admin"], element: <AdminSupportTickets /> },
++  { path: "/settings", roles: ["admin"], element: <ComingSoon title="Platform Settings" /> },
++
++  // Deal board — TC and investor only
++  { path: "/deal-board", roles: ["tc", "investor"], element: <DealBoard /> },
++
++  // Messages — everyone except admin
++  { path: "/messages", roles: ["tc", "investor", "pml"], element: <Messages /> },
++
++  // Service requests — admin, TC, investor (not PML)
++  { path: "/service-requests", roles: ["admin", "tc", "investor"], element: <ServiceRequests /> },
++
++  // Support tickets (member-side) — everyone except admin (admin uses /admin/support instead)
++  { path: "/support", roles: ["tc", "investor", "pml"], element: <SupportTickets /> },
++
++  // Analytics — TC and PML only (investors see deal-board instead)
++  { path: "/analytics", roles: ["tc", "pml"], element: <ComingSoon title="Analytics" /> },
++
++  // PML-only
++  { path: "/pipeline", roles: ["pml"], element: <ComingSoon title="Pipeline" /> },
++
++  // Directories — available to every role
++  { path: "/tc-directory", roles: ALL_ROLES, element: <TCDirectory /> },
++  { path: "/investor-directory", roles: ALL_ROLES, element: <InvestorDirectory /> },
++  { path: "/pml-directory", roles: ALL_ROLES, element: <PMLDirectory /> },
++
++  // "My profile" — resolves to different components per role
++  { path: "/profile", roles: ["tc"], element: <TCProfilePage /> },
++  { path: "/profile", roles: ["investor"], element: <InvestorProfilePage /> },
++  { path: "/profile", roles: ["pml"], element: <PMLProfilePage /> },
++
++  // Role-specific profile views (viewing someone else's profile)
++  // Note: these pre-existing quirks are preserved as-is.
++  //   - TC can hit /profile/pml but not /profile/tc
++  //   - Admin gets /profile/tc and /profile/pml but not /profile/investor
++  //   - Investor and PML get all three
++  { path: "/profile/tc", roles: ["admin", "investor", "pml"], element: <TCProfilePage /> },
++  { path: "/profile/pml", roles: ["admin", "tc", "investor", "pml"], element: <PMLProfilePage /> },
++];
++
++/**
++ * Return just the routes the given role can access.
++ */
++export function routesForRole(role) {
++  if (!role) return [];
++  return AUTHENTICATED_ROUTES.filter(r => r.roles.includes(role));
++}
+-- 
+2.43.0
+
