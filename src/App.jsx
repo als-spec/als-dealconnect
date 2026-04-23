@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
+import { useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
@@ -13,6 +14,26 @@ import Layout from "./components/Layout";
 import Onboarding from "./pages/Onboarding";
 import LandingPage from "./pages/LandingPage";
 import PartnersPage from "./pages/PartnersPage";
+
+/**
+ * Fires navigateToLogin() once after mount, then renders nothing.
+ *
+ * Exists specifically to avoid calling a side effect (window.location
+ * redirect) synchronously during render. When we detect an
+ * unauthenticated visitor on a non-public path, we return this
+ * component instead of calling navigateToLogin() inline — React runs
+ * the effect on commit, the redirect fires, and the app is unmounted
+ * as the page navigates away.
+ *
+ * navigateToLogin is passed as a prop rather than pulled via useAuth()
+ * so this stays a dumb component with a single responsibility.
+ */
+function RedirectToLogin({ navigateToLogin }) {
+  useEffect(() => {
+    navigateToLogin();
+  }, [navigateToLogin]);
+  return null;
+}
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -71,8 +92,24 @@ const AuthenticatedApp = () => {
           </Routes>
         );
       }
-      navigateToLogin();
-      return null;
+      // Unauthenticated visitor tried to navigate to a non-public path
+      // (e.g. clicked 'I'm a TC' → /onboarding?type=tc). Redirect them
+      // to Base44's login page, which offers both Sign In and Sign Up
+      // for new users.
+      //
+      // CRITICAL: this has to run in a useEffect, NOT synchronously
+      // during render. Calling navigateToLogin() (which calls
+      // base44.auth.redirectToLogin, which sets window.location) during
+      // render is a side effect that React silently swallows in strict
+      // mode, making the click appear to do nothing while the URL is
+      // mid-change. Running it in useEffect defers to the post-commit
+      // phase where side effects are legal.
+      //
+      // The <Navigate to="/" /> catch-all in the publicPaths branch
+      // above would also fight us here if we rendered it — the URL
+      // would bounce back to / before the effect fired. Returning null
+      // + effect is the correct shape.
+      return <RedirectToLogin navigateToLogin={navigateToLogin} />;
     }
   }
 
