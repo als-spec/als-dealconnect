@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import DealCard from "@/components/deals/DealCard";
@@ -14,51 +15,79 @@ const EMPTY_FILTERS = { search: "", property_type: "all", deal_type: "all", stat
 
 export default function DealBoard() {
   const { data: user } = useCurrentUser();
-  const [deals, setDeals] = useState([]);
-  const [applications, setApplications] = useState([]);
-  const [tcProfiles, setTcProfiles] = useState({});
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [loading, setLoading] = useState(true);
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [showPostForm, setShowPostForm] = useState(false);
   const [editDeal, setEditDeal] = useState(null);
   const [activeTab, setActiveTab] = useState("board"); // board | matches (investor only)
 
-  const loadData = useCallback(async () => {
-    if (!user) return;
+  // All deals (newest first). Used by every role for the main board.
+  const { data: deals = [], isLoading: loadingDeals } = useQuery({
+    queryKey: ['Deal', 'list', { sort: '-created_date', limit: 100 }],
+    queryFn: () => base44.entities.Deal.list("-created_date", 100),
+    enabled: !!user,
+  });
 
-    const allDeals = await base44.entities.Deal.list("-created_date", 100);
-    setDeals(allDeals);
+  // Investor-only: their own deals' applications. Derived myDeals gates the fetch.
+  const myDeals = useMemo(
+    () => (user?.role === "investor" ? deals.filter(d => d.investor_id === user.id) : []),
+    [deals, user]
+  );
 
-    if (user.role === "investor") {
-      const myDeals = allDeals.filter(d => d.investor_id === user.id);
-      const dealIds = myDeals.map(d => d.id);
-      if (dealIds.length > 0) {
-        const apps = await base44.entities.DealApplication.list("-created_date", 200);
-        const myApps = apps.filter(a => dealIds.includes(a.deal_id));
-        setApplications(myApps);
-        // Load TC profiles for matches
-        const profileMap = {};
-        for (const app of myApps) {
-          if (app.tc_profile_id && !profileMap[app.tc_profile_id]) {
-            const profiles = await base44.entities.TCProfile.filter({ user_id: app.tc_id });
-            if (profiles[0]) profileMap[app.tc_profile_id] = profiles[0];
-          }
-        }
-        setTcProfiles(profileMap);
+  const { data: allApplications = [] } = useQuery({
+    queryKey: ['DealApplication', 'list', { sort: '-created_date', limit: 200 }],
+    queryFn: () => base44.entities.DealApplication.list("-created_date", 200),
+    enabled: user?.role === "investor" && myDeals.length > 0,
+  });
+
+  const applications = useMemo(() => {
+    if (user?.role !== "investor") return [];
+    const dealIds = new Set(myDeals.map(d => d.id));
+    return allApplications.filter(a => dealIds.has(a.deal_id));
+  }, [allApplications, myDeals, user]);
+
+  // TC profiles used for match-card display. Shape differs by role:
+  //   - TC: just their own profile, keyed by user.id
+  //   - Investor: one profile per unique tc_id across their pending applications
+  // Combined into a single query with role-aware fetching so consumers just
+  // index into tcProfiles by either user.id (TC) or tc_profile_id (investor).
+  const { data: tcProfiles = {} } = useQuery({
+    queryKey: [
+      'TCProfile',
+      'dealboard',
+      user?.role,
+      user?.role === "tc" ? user.id : applications.map(a => a.tc_id).filter(Boolean).sort(),
+    ],
+    queryFn: async () => {
+      if (user?.role === "tc") {
+        const profiles = await base44.entities.TCProfile.filter({ user_id: user.id });
+        return profiles[0] ? { [user.id]: profiles[0] } : {};
       }
-    }
+      // Investor path: fetch one profile per unique tc_id from their applications.
+      const seen = new Set();
+      const map = {};
+      for (const app of applications) {
+        if (app.tc_profile_id && app.tc_id && !seen.has(app.tc_id)) {
+          seen.add(app.tc_id);
+          const profiles = await base44.entities.TCProfile.filter({ user_id: app.tc_id });
+          if (profiles[0]) map[app.tc_profile_id] = profiles[0];
+        }
+      }
+      return map;
+    },
+    enabled: !!user && (user.role === "tc" || (user.role === "investor" && applications.length > 0)),
+  });
 
-    if (user.role === "tc") {
-      // Load own TC profile for match display
-      const profiles = await base44.entities.TCProfile.filter({ user_id: user.id });
-      if (profiles[0]) setTcProfiles({ [user.id]: profiles[0] });
-    }
+  const loading = !user || loadingDeals;
 
-    setLoading(false);
-  }, [user]);
-
-  useEffect(() => { loadData(); }, [loadData]);
+  // After any deal mutation (close, apply, create/edit), refresh the deal cache.
+  // Invalidating the broad ['Deal'] / ['DealApplication'] keys catches list and
+  // filter queries alike.
+  const refreshDealBoard = () => {
+    queryClient.invalidateQueries({ queryKey: ['Deal'] });
+    queryClient.invalidateQueries({ queryKey: ['DealApplication'] });
+  };
 
   const filteredDeals = deals.filter(d => {
     if (user?.role === "tc" && (d.status === "closed")) return false;
@@ -71,12 +100,11 @@ export default function DealBoard() {
     return true;
   });
 
-  const myDeals = user ? deals.filter(d => d.investor_id === user.id) : [];
   const pendingApps = applications.filter(a => a.status === "pending");
 
   const handleClosePost = async (deal) => {
     await base44.entities.Deal.update(deal.id, { status: "closed" });
-    loadData();
+    refreshDealBoard();
   };
 
   if (loading) {
@@ -146,7 +174,7 @@ export default function DealBoard() {
                         key={app.id}
                         application={app}
                         tcProfile={tcProfiles[app.tc_profile_id] || tcProfiles[app.tc_id]}
-                        onUpdate={loadData}
+                        onUpdate={refreshDealBoard}
                       />
                     ))}
                   </div>
@@ -205,7 +233,7 @@ export default function DealBoard() {
         userId={user?.id}
         userName={user?.full_name}
         tcProfileId={user?.id}
-        onApplied={() => { setSelectedDeal(null); loadData(); }}
+        onApplied={() => { setSelectedDeal(null); refreshDealBoard(); }}
       />
 
       {/* Post/Edit deal dialog */}
@@ -217,7 +245,7 @@ export default function DealBoard() {
           <PostDealForm
             user={user}
             editDeal={editDeal}
-            onSave={() => { setShowPostForm(false); setEditDeal(null); loadData(); }}
+            onSave={() => { setShowPostForm(false); setEditDeal(null); refreshDealBoard(); }}
             onCancel={() => { setShowPostForm(false); setEditDeal(null); }}
           />
         </DialogContent>
