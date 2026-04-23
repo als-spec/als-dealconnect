@@ -145,7 +145,9 @@ export default function LandingPage({ user }) {
                       className="py-3 cursor-pointer"
                     >
                       <div className="flex items-start gap-3">
-                        <span className="text-xl">🏗️</span>
+                        <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center flex-shrink-0">
+                          <Icon as={Building2} className="w-4 h-4 text-navy" />
+                        </div>
                         <div>
                           <p className="font-bold text-navy text-sm">Investor / Agent</p>
                           <p className="text-xs text-muted-foreground">Post deals, find TCs</p>
@@ -157,7 +159,9 @@ export default function LandingPage({ user }) {
                       className="py-3 cursor-pointer"
                     >
                       <div className="flex items-start gap-3">
-                        <span className="text-xl">💼</span>
+                        <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center flex-shrink-0">
+                          <Icon as={Landmark} className="w-4 h-4 text-navy" />
+                        </div>
                         <div>
                           <p className="font-bold text-navy text-sm">Private Money Lender</p>
                           <p className="text-xs text-muted-foreground">Fund deals, grow portfolio</p>
