@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Plus, LifeBuoy, Loader2, ChevronDown, ChevronUp } from "lucide-react";
@@ -22,8 +23,7 @@ const PRIORITY_STYLES = {
 
 export default function SupportTickets() {
   const { data: user } = useCurrentUser();
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -31,16 +31,14 @@ export default function SupportTickets() {
   const [commentingId, setCommentingId] = useState(null);
   const [form, setForm] = useState({ subject: "", description: "", priority: "medium" });
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    const all = await base44.entities.SupportTicket.filter({ reported_by_user_id: user.id }, "-created_date");
-    setTickets(all);
-    setLoading(false);
-  }, [user]);
+  // Tickets this member has reported.
+  const { data: tickets = [], isLoading: loading } = useQuery({
+    queryKey: ['SupportTicket', { reported_by_user_id: user?.id }],
+    queryFn: () => base44.entities.SupportTicket.filter({ reported_by_user_id: user.id }, "-created_date"),
+    enabled: !!user?.id,
+  });
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const refreshTickets = () => queryClient.invalidateQueries({ queryKey: ['SupportTicket'] });
 
   const handleSubmit = async () => {
     if (!form.subject.trim() || !form.description.trim()) {
@@ -58,7 +56,7 @@ export default function SupportTickets() {
     setForm({ subject: "", description: "", priority: "medium" });
     setShowForm(false);
     setSubmitting(false);
-    load();
+    refreshTickets();
   };
 
   const handleComment = async (ticket) => {
@@ -75,7 +73,7 @@ export default function SupportTickets() {
     });
     setComment("");
     setCommentingId(null);
-    load();
+    refreshTickets();
   };
 
   if (loading) {
