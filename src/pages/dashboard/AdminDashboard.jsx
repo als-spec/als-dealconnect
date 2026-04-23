@@ -30,6 +30,16 @@ export default function AdminDashboard({ user }) {
   // Admin dashboard needs the full user table for role breakdown charts
   // and total member counts. At scale (>~500 members) this should move
   // to a server-side stats aggregation — tracked as T3.4.
+  // Admin dashboard needs the full user table for role breakdown charts,
+  // total member counts, and pending-user synthetic-app derivation. This
+  // is aggregation data, not a paginated list — pagination wouldn't help
+  // because we need every row to compute the stats correctly.
+  //
+  // The proper fix is a server-side stats endpoint that returns just the
+  // aggregates (counts by role, pending-user list, etc.) instead of the
+  // full user records. That requires a custom Base44 function and is
+  // tracked as a follow-up to T3.4 (T3.4 proper covered admin/Members.jsx
+  // pagination, which was a genuine list-scrolling problem).
   const { data: users = [], isLoading: loadingUsers } = useQuery({
     queryKey: ['User', 'list'],
     queryFn: () => base44.entities.User.list(),
