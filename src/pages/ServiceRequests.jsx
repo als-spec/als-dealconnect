@@ -153,12 +153,30 @@ export default function ServiceRequests() {
       content: newComment.trim(),
       timestamp: new Date().toISOString(),
     };
-    const updated = await base44.entities.ServiceRequest.update(selected.id, {
-      comments: [...(selected.comments || []), comment],
-    });
-    setSelected(updated);
-    setNewComment("");
-    await loadRequests();
+    try {
+      // Refetch the fresh record before appending to avoid clobbering a
+      // concurrent comment/document from the other party. See T2.5 in the
+      // audit: comments and documents are arrays embedded on the
+      // ServiceRequest entity, so a stale read + write pattern would
+      // silently lose the other side's additions. This shrinks the race
+      // window to the round-trip between filter() and update().
+      //
+      // Long-term fix: separate Comment entity keyed by request_id (T2.5
+      // proper fix, not in scope for this PR).
+      const fresh = (await base44.entities.ServiceRequest.filter({ id: selected.id }))[0];
+      if (!fresh) {
+        toast.error("This request could not be found. It may have been deleted.");
+        return;
+      }
+      const updated = await base44.entities.ServiceRequest.update(selected.id, {
+        comments: [...(fresh.comments || []), comment],
+      });
+      setSelected(updated);
+      setNewComment("");
+      await loadRequests();
+    } catch (e) {
+      toast.error("Failed to post comment. Please try again.");
+    }
   };
 
   const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
@@ -190,8 +208,16 @@ export default function ServiceRequests() {
         uploaded_by: user.full_name,
         uploaded_at: new Date().toISOString(),
       };
+      // Refetch the fresh record before appending to avoid clobbering a
+      // concurrent document/comment from the other party. Same pattern +
+      // rationale as addComment — T2.5 quick fix.
+      const fresh = (await base44.entities.ServiceRequest.filter({ id: selected.id }))[0];
+      if (!fresh) {
+        toast.error("This request could not be found. It may have been deleted.");
+        return;
+      }
       const updated = await base44.entities.ServiceRequest.update(selected.id, {
-        documents: [...(selected.documents || []), doc],
+        documents: [...(fresh.documents || []), doc],
       });
       setSelected(updated);
       await loadRequests();
