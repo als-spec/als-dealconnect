@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import Logo from "../Logo";
+import Icon from "../Icon";
 import UnreadBadge from "./UnreadBadge";
 import { base44 } from "@/api/base44Client";
 import {
@@ -12,20 +13,33 @@ import {
   MessageSquare,
   BarChart3,
   Settings,
-  Building2,
-  DollarSign,
-  Briefcase,
   LogOut,
   ChevronLeft,
   Menu,
   FileText,
-  TrendingUp,
   LifeBuoy,
+  UserCheck,
+  Landmark,
+  User,
+  Layers,
+  Building2,
 } from "lucide-react";
 
 // Per-role navigation. Must stay in sync with src/lib/routes.jsx — that's
 // the authoritative source for which roles can access which paths. A
 // sidebar link to a route the user can't access would 404 on click.
+//
+// Icon choices (post-modernization):
+//   - UserCheck for TC Directory — 'vetted professionals' semantic, not
+//     generic Briefcase
+//   - Building2 for Investor Directory — real-estate focus, not generic
+//     TrendingUp ('market up' arrow that was overused)
+//   - Landmark for PML Directory — banking-institution silhouette,
+//     distinct from generic DollarSign
+//   - User (unified) for 'My Profile' across all four roles, instead
+//     of the previous role-varying Briefcase/Building2/DollarSign
+//   - Layers for Pipeline — stacked deals, distinct from Applications'
+//     ClipboardList
 //
 // T2.6.1 access philosophy:
 //   - Admin: oversight only. Gets admin/* + service-requests + directories.
@@ -41,49 +55,49 @@ const NAV_ITEMS = {
     { label: "Partners", icon: Handshake, path: "/admin/partners" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
     { label: "Support Tickets", icon: LifeBuoy, path: "/admin/support" },
-    { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
-    { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
-    { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
+    { label: "TC Directory", icon: UserCheck, path: "/tc-directory" },
+    { label: "Investor Directory", icon: Building2, path: "/investor-directory" },
+    { label: "PML Directory", icon: Landmark, path: "/pml-directory" },
     { label: "Settings", icon: Settings, path: "/settings" },
   ],
   tc: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
-    { label: "Pipeline", icon: ClipboardList, path: "/pipeline" },
-    { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
-    { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
-    { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
+    { label: "Pipeline", icon: Layers, path: "/pipeline" },
+    { label: "TC Directory", icon: UserCheck, path: "/tc-directory" },
+    { label: "Investor Directory", icon: Building2, path: "/investor-directory" },
+    { label: "PML Directory", icon: Landmark, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "Analytics", icon: BarChart3, path: "/analytics" },
     { label: "Support", icon: LifeBuoy, path: "/support" },
-    { label: "My Profile", icon: Briefcase, path: "/profile" },
+    { label: "My Profile", icon: User, path: "/profile" },
   ],
   investor: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
-    { label: "Pipeline", icon: ClipboardList, path: "/pipeline" },
-    { label: "TC Directory", icon: Users, path: "/tc-directory" },
-    { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
-    { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
+    { label: "Pipeline", icon: Layers, path: "/pipeline" },
+    { label: "TC Directory", icon: UserCheck, path: "/tc-directory" },
+    { label: "Investor Directory", icon: Building2, path: "/investor-directory" },
+    { label: "PML Directory", icon: Landmark, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "Analytics", icon: BarChart3, path: "/analytics" },
     { label: "Support", icon: LifeBuoy, path: "/support" },
-    { label: "My Profile", icon: Building2, path: "/profile" },
+    { label: "My Profile", icon: User, path: "/profile" },
   ],
   pml: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
-    { label: "Pipeline", icon: ClipboardList, path: "/pipeline" },
-    { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
-    { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
-    { label: "PML Directory", icon: Users, path: "/pml-directory" },
+    { label: "Pipeline", icon: Layers, path: "/pipeline" },
+    { label: "TC Directory", icon: UserCheck, path: "/tc-directory" },
+    { label: "Investor Directory", icon: Building2, path: "/investor-directory" },
+    { label: "PML Directory", icon: Landmark, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
     { label: "Analytics", icon: BarChart3, path: "/analytics" },
     { label: "Support", icon: LifeBuoy, path: "/support" },
-    { label: "My Profile", icon: DollarSign, path: "/profile" },
+    { label: "My Profile", icon: User, path: "/profile" },
   ],
 };
 
@@ -123,7 +137,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
             className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground mx-auto"
             title="ALS Deal Connect"
           >
-            <Menu className="w-5 h-5" />
+            <Icon as={Menu} className="w-5 h-5" />
           </button>
         ) : (
           <>
@@ -135,7 +149,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
               onClick={onToggle}
               className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground shrink-0"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <Icon as={ChevronLeft} className="w-5 h-5" />
             </button>
           </>
         )}
@@ -153,7 +167,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
       {/* Nav */}
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
         {items.map((item) => {
-          const Icon = item.icon;
+          const ItemIcon = item.icon;
           const active = location.pathname === item.path;
           return (
             <Link
@@ -167,7 +181,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
               )}
             >
               <span className="relative">
-                <Icon className={cn("w-5 h-5 shrink-0", active && "text-sidebar-primary")} />
+                <Icon as={ItemIcon} className={cn("w-5 h-5 shrink-0", active && "text-sidebar-primary")} />
                 {item.path === "/messages" && <UnreadBadge userId={userId} />}
               </span>
               {!collapsed && (
@@ -189,7 +203,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors w-full"
         >
-          <LogOut className="w-5 h-5 shrink-0" />
+          <Icon as={LogOut} className="w-5 h-5 shrink-0" />
           {!collapsed && <span className="text-sm font-medium">Logout</span>}
         </button>
       </div>

@@ -1,7 +1,18 @@
 import { Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
-import { ShieldCheck, TrendingUp, Award, DollarSign, ArrowRight, ChevronDown } from "lucide-react";
+import Icon from "@/components/Icon";
+import {
+  ShieldCheck,
+  TrendingUp,
+  Award,
+  DollarSign,
+  ArrowRight,
+  ChevronDown,
+  ClipboardCheck,
+  Building2,
+  Landmark,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -14,8 +25,7 @@ const MEMBER_CARDS = [
     role: "Transaction Coordinator",
     type: "tc",
     ctaLabel: "Join as TC",
-    icon: "📋",
-    color: "from-teal to-cyan",
+    icon: ClipboardCheck,
     tags: ["Creative Finance", "Fix & Flip", "DSCR", "Subject-To"],
     desc: "Join a vetted network of TCs specializing in non-traditional real estate transactions.",
   },
@@ -23,8 +33,7 @@ const MEMBER_CARDS = [
     role: "Investor / Agent",
     type: "investor",
     ctaLabel: "Join as Investor",
-    icon: "🏗️",
-    color: "from-cyan to-blue-400",
+    icon: Building2,
     tags: ["Deal Flow", "TC Matching", "Private Lending", "Closings"],
     desc: "Access top-tier TCs and private lenders to close your creative finance deals faster.",
   },
@@ -32,8 +41,7 @@ const MEMBER_CARDS = [
     role: "Private Money Lender",
     type: "pml",
     ctaLabel: "Join as Lender",
-    icon: "💼",
-    color: "from-teal to-green-400",
+    icon: Landmark,
     tags: ["Bridge Loans", "Fix & Flip", "DSCR", "Ground-Up"],
     desc: "Connect with qualified investors and grow your private lending portfolio.",
   },
@@ -167,9 +175,9 @@ export default function LandingPage({ user }) {
       {/* Trust bar */}
       <section className="bg-navy py-6 px-6">
         <div className="max-w-5xl mx-auto flex flex-wrap justify-center gap-8">
-          {TRUST_ITEMS.map(({ icon: Icon, label }) => (
+          {TRUST_ITEMS.map(({ icon: ItemIcon, label }) => (
             <div key={label} className="flex items-center gap-2 text-white/90">
-              <Icon className="w-5 h-5 text-teal shrink-0" />
+              <Icon as={ItemIcon} className="w-5 h-5 text-teal shrink-0" />
               <span className="text-sm font-semibold">{label}</span>
             </div>
           ))}
@@ -189,9 +197,18 @@ export default function LandingPage({ user }) {
                 key={card.role}
                 className="bg-white rounded-2xl border border-border shadow-sm hover:shadow-lg transition-all hover:-translate-y-1 overflow-hidden"
               >
-                <div className={`h-1.5 bg-gradient-to-r ${card.color}`} />
+                {/* Unified teal accent bar (previously per-card gradient). Keeps the
+                    three cards visually siblings — differentiation comes from the
+                    icon + role name, not competing color bars. */}
+                <div className="h-1.5 bg-teal" />
                 <div className="p-7">
-                  <div className="text-4xl mb-4">{card.icon}</div>
+                  {/* Icon tile — consistent treatment across all three roles:
+                      44×44 rounded tile, subtle teal tint, navy icon.
+                      Replaces the previous emoji (📋 🏗️ 💼) which rendered
+                      as full-color OS-native clip art. */}
+                  <div className="w-11 h-11 rounded-xl bg-teal/10 flex items-center justify-center mb-4">
+                    <Icon as={card.icon} className="w-5 h-5 text-navy" />
+                  </div>
                   <h3 className="text-xl font-extrabold text-navy mb-2">{card.role}</h3>
                   <p className="text-sm text-slate-text mb-5 leading-relaxed">{card.desc}</p>
                   <div className="flex flex-wrap gap-2 mb-6">

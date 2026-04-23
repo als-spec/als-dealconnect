@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Users, ClipboardList, MessageSquare, CheckCircle2, XCircle, Building2, MapPin, BarChart3 } from "lucide-react";
+import Icon from "@/components/Icon";
 import { Button } from "@/components/ui/button";
 import GradientButton from "../../components/GradientButton";
 import { toast } from "sonner";
@@ -10,11 +11,6 @@ import { toastMutationError } from "@/lib/toasts";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
 const TYPE_LABELS = { tc: "Transaction Coordinator", investor: "Investor / Agent", pml: "Private Money Lender" };
-const STATUS_STYLES = {
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
-};
 const PIE_COLORS = ["hsl(168 100% 45%)", "hsl(196 100% 50%)", "hsl(215 55% 15%)", "hsl(213 30% 42%)"];
 
 export default function AdminDashboard({ user }) {
@@ -173,10 +169,10 @@ export default function AdminDashboard({ user }) {
           { icon: ClipboardList, label: "Pending Approvals", value: pending.length },
           { icon: BarChart3, label: "Active Deals", value: deals.filter(d => d.status === "open").length },
           { icon: MessageSquare, label: "Message Threads", value: messages.length },
-        ].map(({ icon: Icon, label, value }) => (
+        ].map(({ icon: StatIcon, label, value }) => (
           <div key={label} className="bg-card rounded-2xl border-t-2 border-t-teal border border-border p-5">
             <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center mb-4">
-              <Icon className="w-5 h-5 text-white" />
+              <Icon as={StatIcon} className="w-5 h-5 text-white" />
             </div>
             <p className="text-2xl font-extrabold text-navy">{value}</p>
             <p className="text-sm text-muted-foreground mt-0.5">{label}</p>
@@ -198,7 +194,7 @@ export default function AdminDashboard({ user }) {
           </div>
           {pending.length === 0 ? (
             <div className="text-center py-10">
-              <CheckCircle2 className="w-10 h-10 text-teal/30 mx-auto mb-2" />
+              <Icon as={CheckCircle2} className="w-10 h-10 text-teal/30 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">All caught up! No pending applications.</p>
             </div>
           ) : (
@@ -211,8 +207,8 @@ export default function AdminDashboard({ user }) {
                       <span className="text-xs font-medium bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full capitalize">{TYPE_LABELS[app.member_type]?.split(" ")[0]}</span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                      {app.company_name && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{app.company_name}</span>}
-                      {app.state && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{app.state}</span>}
+                      {app.company_name && <span className="flex items-center gap-1"><Icon as={Building2} className="w-3 h-3" />{app.company_name}</span>}
+                      {app.state && <span className="flex items-center gap-1"><Icon as={MapPin} className="w-3 h-3" />{app.state}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -221,11 +217,11 @@ export default function AdminDashboard({ user }) {
                       onClick={() => handleAction(app.id, "approved")}
                       disabled={!!processing}
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1 inline" /> Approve
+                      <Icon as={CheckCircle2} className="w-3.5 h-3.5 mr-1 inline" /> Approve
                     </GradientButton>
                     <Button variant="outline" size="sm" className="text-xs border-destructive/30 text-destructive hover:bg-destructive/5 h-7 px-3"
                       onClick={() => handleAction(app.id, "rejected")} disabled={!!processing}>
-                      <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                      <Icon as={XCircle} className="w-3.5 h-3.5 mr-1" /> Reject
                     </Button>
                   </div>
                 </div>

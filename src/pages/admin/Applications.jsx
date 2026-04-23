@@ -11,6 +11,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CheckCircle2, XCircle, Clock, Eye } from "lucide-react";
+import Icon from "@/components/Icon";
+import DotBadge from "@/components/DotBadge";
+import { STATUS_DOT_COLORS } from "@/lib/roleStyles";
 import GradientButton from "../../components/GradientButton";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -19,12 +22,6 @@ const TYPE_LABELS = {
   tc: "Transaction Coordinator",
   investor: "Investor / Agent",
   pml: "Private Money Lender",
-};
-
-const STATUS_STYLES = {
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
 };
 
 export default function Applications() {
@@ -177,7 +174,7 @@ export default function Applications() {
       <div className="space-y-3">
         {filtered.length === 0 && (
           <div className="bg-card rounded-2xl border border-border p-12 text-center">
-            <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <Icon as={Clock} className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">No {filter === "all" ? "" : filter} applications found</p>
           </div>
         )}
@@ -190,11 +187,11 @@ export default function Applications() {
               <div className="flex items-center gap-3 mb-1 flex-wrap">
                 <h3 className="text-base font-bold text-navy">{app.full_name}</h3>
                 <span className="text-sm text-muted-foreground">{app.email}</span>
-                <Badge variant="outline" className={cn("text-xs", STATUS_STYLES[app.status])}>
+                <DotBadge color={STATUS_DOT_COLORS[app.status]} className="capitalize">
                   {app.status}
-                </Badge>
+                </DotBadge>
                 {app.nda_accepted && (
-                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">NDA ✓</Badge>
+                  <Badge variant="outline" className="bg-muted/40 text-foreground border-border/60 text-xs">NDA signed</Badge>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -210,7 +207,7 @@ export default function Applications() {
                 onClick={() => { setSelectedApp(app); setAdminNotes(app.admin_notes || ""); }}
                 className="gap-1.5"
               >
-                <Eye className="w-4 h-4" /> Review
+                <Icon as={Eye} className="w-4 h-4" /> Review
               </Button>
               {app.status === "pending" && (
                 <>
@@ -218,7 +215,7 @@ export default function Applications() {
                     className="text-sm px-4 py-2"
                     onClick={() => handleAction(app.id, "approved")}
                   >
-                    <CheckCircle2 className="w-4 h-4 mr-1.5 inline" /> Approve
+                    <Icon as={CheckCircle2} className="w-4 h-4 mr-1.5 inline" /> Approve
                   </GradientButton>
                   <Button
                     variant="outline"
@@ -226,7 +223,7 @@ export default function Applications() {
                     onClick={() => handleAction(app.id, "rejected")}
                     className="border-destructive/30 text-destructive hover:bg-destructive/5"
                   >
-                    <XCircle className="w-4 h-4 mr-1.5" /> Reject
+                    <Icon as={XCircle} className="w-4 h-4 mr-1.5" /> Reject
                   </Button>
                 </>
               )}
