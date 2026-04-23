@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +20,8 @@ const TIER_BADGE = {
 const EMPTY = { company_name: "", category: "Title Company", tier: "preferred", description: "", website_url: "", logo_color: "#1432c8", is_active: true };
 
 export default function AdminPartners() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState("partners");
-  const [partners, setPartners] = useState([]);
-  const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -31,14 +30,24 @@ export default function AdminPartners() {
   const [approveForm, setApproveForm] = useState({ tier: "preferred", logo_color: "#1432c8" });
   const [processing, setProcessing] = useState(false);
 
-  const load = async () => {
-    const all = await base44.entities.Partner.list("-created_date");
-    setPartners(all.filter(p => !p.application_status || p.application_status === "approved"));
-    setApplications(all.filter(p => p.application_status === "pending" || p.application_status === "rejected"));
-    setLoading(false);
-  };
+  // All partner records. Derived partitions below avoid a second round-trip.
+  const { data: all = [], isLoading: loading } = useQuery({
+    queryKey: ['Partner', 'list', { sort: '-created_date' }],
+    queryFn: () => base44.entities.Partner.list("-created_date"),
+  });
 
-  useEffect(() => { load(); }, []);
+  const partners = useMemo(
+    () => all.filter(p => !p.application_status || p.application_status === "approved"),
+    [all]
+  );
+  const applications = useMemo(
+    () => all.filter(p => p.application_status === "pending" || p.application_status === "rejected"),
+    [all]
+  );
+
+  // Invalidate after any create/update/delete. Always goes through the same
+  // query key, so both partitions refresh together.
+  const refreshPartners = () => queryClient.invalidateQueries({ queryKey: ['Partner'] });
 
   const openNew = () => { setForm(EMPTY); setEditing(null); setShowForm(true); };
   const openEdit = (p) => { setForm({ ...p }); setEditing(p.id); setShowForm(true); };
@@ -56,7 +65,7 @@ export default function AdminPartners() {
         toast.success("Partner added");
       }
       setShowForm(false);
-      load();
+      refreshPartners();
     } catch (e) {
       toast.error("Failed to save partner. Please try again.");
     } finally {
@@ -69,7 +78,7 @@ export default function AdminPartners() {
     try {
       await base44.entities.Partner.delete(id);
       toast.success("Partner removed");
-      load();
+      refreshPartners();
     } catch (e) {
       toast.error("Failed to remove partner.");
     }
@@ -104,7 +113,7 @@ export default function AdminPartners() {
       }
       toast.success(`${reviewApp.company_name} approved and is now live on the Partners page.`);
       setReviewApp(null);
-      load();
+      refreshPartners();
     } catch (e) {
       toast.error("Failed to approve application. Please try again.");
     } finally {
@@ -134,7 +143,7 @@ export default function AdminPartners() {
       }
       toast.success("Application rejected.");
       setReviewApp(null);
-      load();
+      refreshPartners();
     } catch (e) {
       toast.error("Failed to reject application. Please try again.");
     } finally {
