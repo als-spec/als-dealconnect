@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import Logo from "../components/Logo";
@@ -28,8 +29,6 @@ const EMPTY_FORM = {
 export default function PartnersPage({ user }) {
   const navigate = useNavigate();
   const authedUser = user ?? null;
-  const [partners, setPartners] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [showApply, setShowApply] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -37,12 +36,11 @@ export default function PartnersPage({ user }) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    base44.entities.Partner.filter({ is_active: true }).then((data) => {
-      setPartners(data);
-      setLoading(false);
-    });
-  }, []);
+  // Active partners for the public directory. Public page — no auth needed.
+  const { data: partners = [], isLoading: loading } = useQuery({
+    queryKey: ['Partner', { is_active: true }],
+    queryFn: () => base44.entities.Partner.filter({ is_active: true }),
+  });
 
   const filtered = filter === "All"
     ? partners
