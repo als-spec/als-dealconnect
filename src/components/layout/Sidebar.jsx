@@ -23,12 +23,23 @@ import {
   LifeBuoy,
 } from "lucide-react";
 
+// Per-role navigation. Must stay in sync with src/lib/routes.jsx — that's
+// the authoritative source for which roles can access which paths. A
+// sidebar link to a route the user can't access would 404 on click.
+//
+// T2.6.1 access philosophy:
+//   - Admin: oversight only. Gets admin/* + service-requests + directories.
+//     No deal-board, pipeline, analytics, own-profile.
+//   - TC/Investor/PML: full networking participants. Get deal-board,
+//     service-requests, pipeline, analytics, messages, support, own-profile
+//     + all three directories.
 const NAV_ITEMS = {
   admin: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Applications", icon: ClipboardList, path: "/admin/applications" },
     { label: "Members", icon: Users, path: "/admin/members" },
     { label: "Partners", icon: Handshake, path: "/admin/partners" },
+    { label: "Service Requests", icon: FileText, path: "/service-requests" },
     { label: "Support Tickets", icon: LifeBuoy, path: "/admin/support" },
     { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
     { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
@@ -39,6 +50,7 @@ const NAV_ITEMS = {
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
+    { label: "Pipeline", icon: ClipboardList, path: "/pipeline" },
     { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
     { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
     { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
@@ -51,15 +63,19 @@ const NAV_ITEMS = {
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
     { label: "Service Requests", icon: FileText, path: "/service-requests" },
+    { label: "Pipeline", icon: ClipboardList, path: "/pipeline" },
     { label: "TC Directory", icon: Users, path: "/tc-directory" },
     { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
     { label: "PML Directory", icon: DollarSign, path: "/pml-directory" },
     { label: "Messages", icon: MessageSquare, path: "/messages" },
+    { label: "Analytics", icon: BarChart3, path: "/analytics" },
     { label: "Support", icon: LifeBuoy, path: "/support" },
     { label: "My Profile", icon: Building2, path: "/profile" },
   ],
   pml: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+    { label: "Deal Board", icon: ClipboardList, path: "/deal-board" },
+    { label: "Service Requests", icon: FileText, path: "/service-requests" },
     { label: "Pipeline", icon: ClipboardList, path: "/pipeline" },
     { label: "TC Directory", icon: Briefcase, path: "/tc-directory" },
     { label: "Investor Directory", icon: TrendingUp, path: "/investor-directory" },
