@@ -1,6 +1,6 @@
-From 5b55c6aa397ce34ecca2b3a194f80b5c54fb0055 Mon Sep 17 00:00:00 2001
+From f59c4e715b60855e5a253e8a55c101f578e66ff2 Mon Sep 17 00:00:00 2001
 From: Claude <claude@anthropic.com>
-Date: Thu, 23 Apr 2026 17:27:36 +0000
+Date: Thu, 23 Apr 2026 17:51:42 +0000
 Subject: [PATCH] Icon modernization: emoji removal, thin strokes, neutral
  badges
 MIME-Version: 1.0
@@ -66,6 +66,8 @@ Five surfaces migrated:
 
   2. src/components/layout/Sidebar.jsx
      - All nav icons migrated through Icon wrapper for thin stroke.
+     - Header Menu/ChevronLeft icons (inside the collapsed/expanded
+       two-button structure) wrapped.
      - Curated icon picks:
          TC Directory:       Briefcase → UserCheck
          Investor Directory: TrendingUp → Building2
@@ -75,7 +77,6 @@ Five surfaces migrated:
          My Profile (all 4 roles): unified to User, replacing the
                              role-varying Briefcase/Building2/DollarSign.
                              Profile is a profile regardless of role.
-     - Logout, Menu, ChevronLeft icons also wrapped.
 
   3. src/pages/admin/Members.jsx
      - ROLE_COLORS constant (5 color families) removed.
@@ -105,6 +106,13 @@ Five surfaces migrated:
      - Empty state and inline icons (CheckCircle2, Building2,
        MapPin, XCircle) wrapped.
 
+Patch baseline note:
+  This PR's Sidebar.jsx hunks are generated against the current
+  production structure (two-button Logo+title header). The preflight
+  check in the plan verifies this with a grep for
+  'title="ALS Deal Connect"'; fail-fast if the Sidebar structure
+  has diverged.
+
 What's deliberately NOT in scope (follow-ups):
 
   - ServiceRequest status badges (RequestList, RequestDetail) —
@@ -131,24 +139,24 @@ Verification:
     transitions, edit flows all preserved exactly
 
 Files (8):
-  - [new] src/components/Icon.jsx (43 lines)
-  - [new] src/components/DotBadge.jsx (46 lines)
-  - [new] src/lib/roleStyles.js (67 lines)
-  - src/pages/LandingPage.jsx (+25/-14)
-  - src/components/layout/Sidebar.jsx (+36/-30)
-  - src/pages/admin/Members.jsx (+16/-20)
-  - src/pages/admin/Applications.jsx (+13/-10)
-  - src/pages/dashboard/AdminDashboard.jsx (+8/-12)
+  - [new] src/components/Icon.jsx
+  - [new] src/components/DotBadge.jsx
+  - [new] src/lib/roleStyles.js
+  - src/pages/LandingPage.jsx
+  - src/components/layout/Sidebar.jsx
+  - src/pages/admin/Members.jsx
+  - src/pages/admin/Applications.jsx
+  - src/pages/dashboard/AdminDashboard.jsx
 ---
  src/components/DotBadge.jsx            | 50 +++++++++++++++++++
- src/components/Icon.jsx                | 43 +++++++++++++++++
- src/components/layout/Sidebar.jsx      | 66 +++++++++++++++----------
- src/lib/roleStyles.js                  | 67 ++++++++++++++++++++++++++
+ src/components/Icon.jsx                | 43 ++++++++++++++++
+ src/components/layout/Sidebar.jsx      | 68 ++++++++++++++++----------
+ src/lib/roleStyles.js                  | 67 +++++++++++++++++++++++++
  src/pages/LandingPage.jsx              | 39 ++++++++++-----
  src/pages/admin/Applications.jsx       | 23 ++++-----
  src/pages/admin/Members.jsx            | 36 +++++---------
  src/pages/dashboard/AdminDashboard.jsx | 20 +++-----
- 8 files changed, 258 insertions(+), 86 deletions(-)
+ 8 files changed, 259 insertions(+), 87 deletions(-)
  create mode 100644 src/components/DotBadge.jsx
  create mode 100644 src/components/Icon.jsx
  create mode 100644 src/lib/roleStyles.js
@@ -259,7 +267,7 @@ index 0000000..f595897
 +  );
 +}
 diff --git a/src/components/layout/Sidebar.jsx b/src/components/layout/Sidebar.jsx
-index 4f25a0b..c89e07c 100644
+index 191a459..aff7d39 100644
 --- a/src/components/layout/Sidebar.jsx
 +++ b/src/components/layout/Sidebar.jsx
 @@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
@@ -377,16 +385,25 @@ index 4f25a0b..c89e07c 100644
    ],
  };
  
-@@ -122,7 +136,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
-           onClick={onToggle}
-           className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground"
-         >
--          {collapsed ? <Menu className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-+          {collapsed ? <Icon as={Menu} className="w-5 h-5" /> : <Icon as={ChevronLeft} className="w-5 h-5" />}
-         </button>
-       </div>
- 
-@@ -138,7 +152,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
+@@ -123,7 +137,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
+             className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground mx-auto"
+             title="ALS Deal Connect"
+           >
+-            <Menu className="w-5 h-5" />
++            <Icon as={Menu} className="w-5 h-5" />
+           </button>
+         ) : (
+           <>
+@@ -135,7 +149,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
+               onClick={onToggle}
+               className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground shrink-0"
+             >
+-              <ChevronLeft className="w-5 h-5" />
++              <Icon as={ChevronLeft} className="w-5 h-5" />
+             </button>
+           </>
+         )}
+@@ -153,7 +167,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
        {/* Nav */}
        <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
          {items.map((item) => {
@@ -395,7 +412,7 @@ index 4f25a0b..c89e07c 100644
            const active = location.pathname === item.path;
            return (
              <Link
-@@ -152,7 +166,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
+@@ -167,7 +181,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
                )}
              >
                <span className="relative">
@@ -404,7 +421,7 @@ index 4f25a0b..c89e07c 100644
                  {item.path === "/messages" && <UnreadBadge userId={userId} />}
                </span>
                {!collapsed && (
-@@ -174,7 +188,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
+@@ -189,7 +203,7 @@ export default function Sidebar({ userRole, collapsed, onToggle, userId, mobileO
            onClick={handleLogout}
            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors w-full"
          >

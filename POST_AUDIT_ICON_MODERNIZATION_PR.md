@@ -6,7 +6,7 @@ Visual consistency pass. Three coordinated changes:
 2. **All lucide icons thinned from 2px → 1.5px stroke.** Apple SF Symbols aesthetic; icons feel quieter.
 3. **Rainbow role/status badges → neutral badge + brand-palette dot.** 19+ sites previously used 5 different color families (`bg-purple-50`, `bg-blue-50`, `bg-emerald-50`, `bg-amber-50`, `bg-red-50`) for semantic meaning. Now: neutral background, small colored dot from the brand palette.
 
-**Stats:** 8 files changed · +258 / −86 (net +172) · Build ✅ · Full lint ✅ (0 errors)
+**Stats:** 8 files changed · +259 / −87 (net +172) · Build ✅ · Full lint ✅ (0 errors) · Patch self-tested via `git apply --check` against main before delivery
 
 ---
 
@@ -91,7 +91,7 @@ Renders as: neutral background (`bg-muted/40`), small colored dot (6px), label t
 - Trust row icons wrapped with Icon for thin stroke.
 
 ### 2. `src/components/layout/Sidebar.jsx`
-All nav icons through the Icon wrapper. Curated picks:
+All nav icons through the Icon wrapper. Header Menu (collapsed-state) and ChevronLeft (expanded-state) also wrapped. Curated picks:
 
 | Nav item | Before | After |
 |---|---|---|
@@ -145,11 +145,21 @@ The `My Profile` unification is a small but meaningful change: the link goes to 
 
 ---
 
+## A note on the patch itself
+
+An earlier version of this patch was generated against a stale Sidebar.jsx and failed to apply during an initial `git am` attempt. The patch was regenerated against the current production baseline (the two-button Logo+title header structure). The plan's preflight now includes a structure check that fails fast with a clear message if the Sidebar has diverged again.
+
+**Lessons baked into the plan for future PRs:**
+- Preflight baseline checks now grep for file-unique tokens, not just file existence
+- Patches are self-tested via `git apply --check` against main before delivery
+
+---
+
 ## Dependencies
 
 **Hard:**
 - ✅ T2.2b (admin useQuery) — Members.jsx and Applications.jsx still use their useQuery patterns
-- ✅ mutation-toasts — Members.jsx + Applications.jsx handlers depend on that PR's try/catch
+- ✅ mutation-toasts — Members.jsx handler depends on that PR's try/catch
 
 **Soft:** none
 
@@ -174,7 +184,8 @@ No conflicts with other pending PRs. New files (`Icon.jsx`, `DotBadge.jsx`, `rol
   - TC Directory shows `UserCheck`, Investor Directory shows `Building2`, PML Directory shows `Landmark`
   - "My Profile" shows `User` icon consistently regardless of role (was `Briefcase`/`Building2`/`DollarSign` before)
   - Pipeline shows `Layers` (not `ClipboardList` — that's still Applications)
-  - Collapse chevron and Menu hamburger still work; stroke is thinner
+  - Collapse button: Menu (hamburger) icon renders with thin stroke
+  - Expanded state: Logo + "ALS Deal Connect" label intact, ChevronLeft toggle renders with thin stroke
 
 - [ ] **`/admin/members`:**
   - Role column shows compact pills with: small colored dot + "Admin" / "Transaction Coordinator" / etc. NOT rainbow backgrounds
@@ -205,10 +216,9 @@ No conflicts with other pending PRs. New files (`Icon.jsx`, `DotBadge.jsx`, `rol
 ## Reviewer notes
 
 - **Why no visual-regression tests?** The codebase doesn't have a test harness; manual smoke tests are the current verification path.
-- **Why keep the gradient-primary tile on stat cards?** The AFTER mockup I shared showed dark navy + teal icon, but the existing gradient-primary (teal-to-cobalt) is already on-brand. No need to churn it. Future refinement could go either way.
+- **Why keep the gradient-primary tile on stat cards?** The AFTER mockup shown during planning had dark navy + teal icon, but the existing gradient-primary (teal-to-cobalt) is already on-brand. No need to churn it. Future refinement could go either way.
 - **Why drop the NDA emerald badge?** `NDA ✓` with the checkmark character and emerald fill was visually the loudest thing on an application row, despite being low-priority info. Quieter `NDA signed` on neutral reads as "present but not shouting for attention." The application's status (DotBadge) is what should dominate the row visually.
-- **Why `rejected` → gray dot?** Already explained above but worth restating: a red dot on a list of rejected applications reads as "something is wrong, take action." Nothing is wrong — those are correctly rejected and logged. The label does the semantic work; the dot just needs to be distinct.
-- **Why isn't `STATUS_DOT_COLORS.rejected` also defined for consistency with red?** It IS defined (as gray). The map is complete. The question was whether to use red — that's a design call. If anyone wants red, it's a one-line change in `roleStyles.js`.
+- **Why `rejected` → gray dot?** A red dot on a list of rejected applications reads as "something is wrong, take action." Nothing is wrong — those are correctly rejected and logged. The label does the semantic work; the dot just needs to be distinct.
 
 ---
 

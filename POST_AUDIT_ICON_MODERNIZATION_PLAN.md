@@ -15,12 +15,17 @@ Apply `post-audit-icon-modernization.patch` to branch `post-audit-icon-moderniza
 ## Inputs (expected at repo root)
 
 - `POST_AUDIT_ICON_MODERNIZATION_PLAN.md` — this file
-- `post-audit-icon-modernization.patch` — git-formatted patch (1 commit, 8 files, +258/−86)
+- `post-audit-icon-modernization.patch` — git-formatted patch (1 commit, 8 files, +259/−87)
 - `POST_AUDIT_ICON_MODERNIZATION_PR.md` — PR body
 
 ---
 
 ## Preflight
+
+This preflight has an extra baseline check (vs. earlier plans) because the
+initial version of this patch was generated against a stale Sidebar.jsx
+structure. The check below fails fast if the production Sidebar has
+diverged again.
 
 ```bash
 git rev-parse --git-dir
@@ -38,6 +43,22 @@ if ! test -f src/lib/toasts.js; then
 fi
 if ! grep -q "MEMBER_ROLES" src/lib/routes.jsx 2>/dev/null; then
   echo "ERROR: T2.6.1 not merged"
+  exit 1
+fi
+
+# Sidebar structure check — this patch edits Sidebar.jsx at specific
+# sites and expects the two-button Logo+title header structure. If
+# Sidebar has diverged, the patch will fail mid-apply.
+if ! grep -q 'title="ALS Deal Connect"' src/components/layout/Sidebar.jsx; then
+  echo "ERROR: Sidebar.jsx does NOT match the expected production baseline."
+  echo ""
+  echo "This patch was generated against a Sidebar with:"
+  echo "  - Collapsed state: single button with title=\"ALS Deal Connect\""
+  echo "  - Expanded state:  Logo + 'ALS Deal Connect' span in a div,"
+  echo "                     separate ChevronLeft button with shrink-0"
+  echo ""
+  echo "Your Sidebar.jsx appears to be a different structure. The patch"
+  echo "will fail to apply. Share Sidebar.jsx contents for patch regeneration."
   exit 1
 fi
 
@@ -72,13 +93,15 @@ fi
 git am post-audit-icon-modernization.patch
 ```
 
-Expected: 1 commit, 8 files, +258/−86.
+Expected: 1 commit, 8 files, +259/−87.
 
 ```bash
 git log --oneline origin/main..HEAD
 # Should show:
 #   <sha> Icon modernization: emoji removal, thin strokes, neutral badges
 ```
+
+If `git am` fails here despite preflight passing, run `git am --abort` and report — something else changed in one of the other edited files since the patch was generated.
 
 ---
 
@@ -183,7 +206,7 @@ Idempotent. Preflight check for `src/components/Icon.jsx` catches double-applica
 
 ```
 ✅ Phase 1: Branch post-audit-icon-modernization ready
-✅ Phase 2: Applied 1 commit (8 files, +258/−86)
+✅ Phase 2: Applied 1 commit (8 files, +259/−87)
 ✅ Phase 3: Scoped lint (0 errors) + Full lint (0 errors) + Build OK
             ✅ All three changes applied: emoji gone, thin stroke
             wrapper in place, DotBadge migrated
@@ -199,6 +222,9 @@ Idempotent. Preflight check for `src/components/Icon.jsx` catches double-applica
 - Smoke tests recommended after deploy:
     * Open the landing page (logged out) — the three user-type cards should show ClipboardCheck/Building2/Landmark icons in rounded teal-tinted tiles, NOT emoji
     * Open sidebar as TC, Investor, PML, admin — stroke weight should look noticeably lighter; TC Directory shows UserCheck, Investor Directory shows Building2, PML Directory shows Landmark
+    * Collapse the sidebar — Menu icon (hamburger) thin-stroke, clicking expands; expanded state shows the Logo + "ALS Deal Connect" label + thin-stroke ChevronLeft
     * Open /admin/members — role pills (Admin/TC/Investor/PML/Pending) show as neutral background with small colored dot, NOT rainbow-filled pills
     * Open /admin/applications — status shows as neutral+dot DotBadge; NDA shows as neutral 'NDA signed' text (no more emerald fill)
     * Open AdminDashboard — stat card icons render with lighter stroke
+
+- Patch was self-tested against main via `git apply --check` before delivery — confirmed applies cleanly.
