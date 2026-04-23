@@ -7,27 +7,12 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { routesForRole } from "@/lib/routes";
 
 import Layout from "./components/Layout";
 import Onboarding from "./pages/Onboarding";
-import Dashboard from "./pages/Dashboard";
-import Applications from "./pages/admin/Applications";
-import Members from "./pages/admin/Members";
-import ComingSoon from "./pages/ComingSoon";
-import TCProfilePage from "./pages/TCProfilePage";
-import InvestorProfilePage from "./pages/InvestorProfilePage";
-import TCDirectory from "./pages/TCDirectory";
-import PMLProfilePage from "./pages/PMLProfilePage";
-import PMLDirectory from "./pages/PMLDirectory";
-import DealBoard from "./pages/DealBoard";
-import Messages from "./pages/Messages";
-import ServiceRequests from "./pages/ServiceRequests";
 import LandingPage from "./pages/LandingPage";
 import PartnersPage from "./pages/PartnersPage";
-import AdminPartners from "./pages/admin/Partners";
-import InvestorDirectory from "./pages/InvestorDirectory";
-import SupportTickets from "./pages/SupportTickets";
-import AdminSupportTickets from "./pages/admin/SupportTickets";
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -84,78 +69,19 @@ const AuthenticatedApp = () => {
     );
   }
 
+  // Role-scoped authenticated routes — see src/lib/routes.jsx for the
+  // permission matrix. routesForRole returns only the entries visible to
+  // the current user's role.
+  const userRoutes = routesForRole(user?.role);
+
   return (
     <Routes>
       <Route path="/" element={<LandingPage user={user} />} />
       <Route path="/partners" element={<PartnersPage user={user} />} />
       <Route element={<Layout user={user} />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-
-        {/* Admin routes */}
-        {user?.role === "admin" && (
-          <>
-            <Route path="/admin/applications" element={<Applications />} />
-            <Route path="/admin/members" element={<Members />} />
-            <Route path="/admin/partners" element={<AdminPartners />} />
-            <Route path="/admin/support" element={<AdminSupportTickets />} />
-            <Route path="/service-requests" element={<ServiceRequests />} />
-            <Route path="/settings" element={<ComingSoon title="Platform Settings" />} />
-            <Route path="/profile/tc" element={<TCProfilePage />} />
-            <Route path="/profile/pml" element={<PMLProfilePage />} />
-            <Route path="/tc-directory" element={<TCDirectory />} />
-            <Route path="/investor-directory" element={<InvestorDirectory />} />
-            <Route path="/pml-directory" element={<PMLDirectory />} />
-          </>
-        )}
-
-        {/* TC routes */}
-        {user?.role === "tc" && (
-          <>
-            <Route path="/deal-board" element={<DealBoard />} />
-            <Route path="/messages" element={<Messages />} />
-            <Route path="/service-requests" element={<ServiceRequests />} />
-            <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
-            <Route path="/support" element={<SupportTickets />} />
-            <Route path="/profile" element={<TCProfilePage />} />
-            <Route path="/tc-directory" element={<TCDirectory />} />
-            <Route path="/investor-directory" element={<InvestorDirectory />} />
-            <Route path="/pml-directory" element={<PMLDirectory />} />
-            <Route path="/profile/pml" element={<PMLProfilePage />} />
-          </>
-        )}
-
-        {/* Investor routes */}
-        {user?.role === "investor" && (
-          <>
-            <Route path="/deal-board" element={<DealBoard />} />
-            <Route path="/tc-directory" element={<TCDirectory />} />
-            <Route path="/investor-directory" element={<InvestorDirectory />} />
-            <Route path="/pml-directory" element={<PMLDirectory />} />
-            <Route path="/messages" element={<Messages />} />
-            <Route path="/service-requests" element={<ServiceRequests />} />
-            <Route path="/support" element={<SupportTickets />} />
-            <Route path="/profile" element={<InvestorProfilePage />} />
-            <Route path="/profile/tc" element={<TCProfilePage />} />
-            <Route path="/profile/pml" element={<PMLProfilePage />} />
-          </>
-        )}
-
-        {/* PML routes */}
-        {user?.role === "pml" && (
-          <>
-            <Route path="/pipeline" element={<ComingSoon title="Pipeline" />} />
-            <Route path="/messages" element={<Messages />} />
-            <Route path="/analytics" element={<ComingSoon title="Analytics" />} />
-            <Route path="/support" element={<SupportTickets />} />
-            <Route path="/profile" element={<PMLProfilePage />} />
-            <Route path="/tc-directory" element={<TCDirectory />} />
-            <Route path="/investor-directory" element={<InvestorDirectory />} />
-            <Route path="/pml-directory" element={<PMLDirectory />} />
-            <Route path="/profile/tc" element={<TCProfilePage />} />
-            <Route path="/profile/pml" element={<PMLProfilePage />} />
-          </>
-        )}
-
+        {userRoutes.map(({ path, element }) => (
+          <Route key={path} path={path} element={element} />
+        ))}
         <Route path="*" element={<PageNotFound />} />
       </Route>
       <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
