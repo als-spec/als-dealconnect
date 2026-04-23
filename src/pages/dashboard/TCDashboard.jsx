@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { ClipboardList, CheckCircle2, Star, Eye, ArrowUpRight, MessageSquare, Award } from "lucide-react";
@@ -36,32 +37,41 @@ const earningsData = [
 ];
 
 export default function TCDashboard({ user }) {
-  const [serviceRequests, setServiceRequests] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [threads, setThreads] = useState([]);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Service requests this TC is party to.
+  const { data: serviceRequests = [], isLoading: loadingReqs } = useQuery({
+    queryKey: ['ServiceRequest', { tc_id: user?.id }],
+    queryFn: () => base44.entities.ServiceRequest.filter({ tc_id: user.id }),
+    enabled: !!user?.id,
+  });
 
-  useEffect(() => {
-    if (!user?.id) return;
-    load();
-  }, [user?.id]);
+  // This TC's own profile. Needed for reviews query to cascade.
+  const { data: profiles = [], isLoading: loadingProfile } = useQuery({
+    queryKey: ['TCProfile', { user_id: user?.id }],
+    queryFn: () => base44.entities.TCProfile.filter({ user_id: user.id }),
+    enabled: !!user?.id,
+  });
+  const profile = profiles[0] || null;
 
-  const load = async () => {
-    const [reqs, profiles, threads_] = await Promise.all([
-      base44.entities.ServiceRequest.filter({ tc_id: user.id }),
-      base44.entities.TCProfile.filter({ user_id: user.id }),
-      base44.entities.MessageThread.list('-last_message_at', 50),
-    ]);
-    setServiceRequests(reqs);
-    setThreads(threads_.filter(t => t.participants?.includes(user.id)));
-    if (profiles.length > 0) {
-      setProfile(profiles[0]);
-      const revs = await base44.entities.Review.filter({ tc_profile_id: profiles[0].id });
-      setReviews(revs);
-    }
-    setLoading(false);
-  };
+  // Reviews — depends on profile.id.
+  const { data: reviews = [] } = useQuery({
+    queryKey: ['Review', { tc_profile_id: profile?.id }],
+    queryFn: () => base44.entities.Review.filter({ tc_profile_id: profile.id }),
+    enabled: !!profile?.id,
+  });
+
+  // Message threads — filtered client-side by participant.
+  const { data: allThreads = [], isLoading: loadingThreads } = useQuery({
+    queryKey: ['MessageThread', 'list', { sort: '-last_message_at', limit: 50 }],
+    queryFn: () => base44.entities.MessageThread.list('-last_message_at', 50),
+    enabled: !!user?.id,
+  });
+
+  const threads = useMemo(
+    () => (user?.id ? allThreads.filter(t => t.participants?.includes(user.id)) : []),
+    [allThreads, user?.id]
+  );
+
+  const loading = loadingReqs || loadingProfile || loadingThreads;
 
   const activeRequests = serviceRequests.filter(r => r.status !== "completed");
   const completedDeals = serviceRequests.filter(r => r.status === "completed").length;

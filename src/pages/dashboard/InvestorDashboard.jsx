@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { ClipboardList, Users, FileText, DollarSign, ArrowUpRight } from "lucide-react";
@@ -31,30 +32,40 @@ const SR_COLORS = {
 };
 
 export default function InvestorDashboard({ user }) {
-  const [deals, setDeals] = useState([]);
-  const [serviceRequests, setServiceRequests] = useState([]);
-  const [threads, setThreads] = useState([]);
-  const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // This investor's deals.
+  const { data: deals = [], isLoading: loadingDeals } = useQuery({
+    queryKey: ['Deal', { investor_id: user?.id }],
+    queryFn: () => base44.entities.Deal.filter({ investor_id: user.id }),
+    enabled: !!user?.id,
+  });
 
-  useEffect(() => {
-    if (!user?.id) return;
-    load();
-  }, [user?.id]);
+  // Service requests this investor is party to.
+  const { data: serviceRequests = [], isLoading: loadingReqs } = useQuery({
+    queryKey: ['ServiceRequest', { investor_id: user?.id }],
+    queryFn: () => base44.entities.ServiceRequest.filter({ investor_id: user.id }),
+    enabled: !!user?.id,
+  });
 
-  const load = async () => {
-    const [deals_, reqs, threads_, apps] = await Promise.all([
-      base44.entities.Deal.filter({ investor_id: user.id }),
-      base44.entities.ServiceRequest.filter({ investor_id: user.id }),
-      base44.entities.MessageThread.list('-last_message_at', 50),
-      base44.entities.DealApplication.list('-created_date', 200),
-    ]);
-    setDeals(deals_);
-    setServiceRequests(reqs);
-    setThreads(threads_.filter(t => t.participants?.includes(user.id)));
-    setApplications(apps);
-    setLoading(false);
-  };
+  // All deal applications (filtered client-side to applicants for this investor's deals).
+  const { data: applications = [] } = useQuery({
+    queryKey: ['DealApplication', 'list', { sort: '-created_date', limit: 200 }],
+    queryFn: () => base44.entities.DealApplication.list('-created_date', 200),
+    enabled: !!user?.id,
+  });
+
+  // Message threads — filtered client-side by participant.
+  const { data: allThreads = [], isLoading: loadingThreads } = useQuery({
+    queryKey: ['MessageThread', 'list', { sort: '-last_message_at', limit: 50 }],
+    queryFn: () => base44.entities.MessageThread.list('-last_message_at', 50),
+    enabled: !!user?.id,
+  });
+
+  const threads = useMemo(
+    () => (user?.id ? allThreads.filter(t => t.participants?.includes(user.id)) : []),
+    [allThreads, user?.id]
+  );
+
+  const loading = loadingDeals || loadingReqs || loadingThreads;
 
   const activeDeals = deals.filter(d => d.status === "open" || d.status === "in_review");
   const tcConnections = [...new Set(serviceRequests.map(r => r.tc_id))].length;

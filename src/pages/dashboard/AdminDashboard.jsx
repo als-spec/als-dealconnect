@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Users, ClipboardList, MessageSquare, CheckCircle2, XCircle, Building2, MapPin, BarChart3 } from "lucide-react";
@@ -16,31 +17,43 @@ const STATUS_STYLES = {
 const PIE_COLORS = ["hsl(168 100% 45%)", "hsl(196 100% 50%)", "hsl(215 55% 15%)", "hsl(213 30% 42%)"];
 
 export default function AdminDashboard({ user }) {
-  const [applications, setApplications] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [deals, setDeals] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [processing, setProcessing] = useState(null);
 
-  useEffect(() => {
-    load();
-  }, []);
+  // Five parallel queries. Each has its own cache entry shared with other
+  // admin pages (Applications, Members, Partners).
+  const { data: apps = [], isLoading: loadingApps } = useQuery({
+    queryKey: ['MemberApplication', 'list', { sort: '-created_date' }],
+    queryFn: () => base44.entities.MemberApplication.list('-created_date'),
+  });
 
-  const load = async () => {
-    const [apps, users, deals_, threads, revs] = await Promise.all([
-      base44.entities.MemberApplication.list('-created_date'),
-      // Admin dashboard needs the full user table for role breakdown charts
-      // and total member counts. At scale (>~500 members) this should move
-      // to a server-side stats aggregation — tracked as T3.4.
-      base44.entities.User.list(),
-      base44.entities.Deal.list(),
-      base44.entities.MessageThread.list(),
-      base44.entities.Review.list('-created_date', 20),
-    ]);
+  // Admin dashboard needs the full user table for role breakdown charts
+  // and total member counts. At scale (>~500 members) this should move
+  // to a server-side stats aggregation — tracked as T3.4.
+  const { data: users = [], isLoading: loadingUsers } = useQuery({
+    queryKey: ['User', 'list'],
+    queryFn: () => base44.entities.User.list(),
+  });
 
-    // Synthesize pending entries for users with pending_approval step but no MemberApplication
+  const { data: deals = [], isLoading: loadingDeals } = useQuery({
+    queryKey: ['Deal', 'list'],
+    queryFn: () => base44.entities.Deal.list(),
+  });
+
+  const { data: messages = [] } = useQuery({
+    queryKey: ['MessageThread', 'list'],
+    queryFn: () => base44.entities.MessageThread.list(),
+  });
+
+  const { data: reviews = [] } = useQuery({
+    queryKey: ['Review', 'list', { sort: '-created_date', limit: 20 }],
+    queryFn: () => base44.entities.Review.list('-created_date', 20),
+  });
+
+  // Derive synthetic entries for pending users with no MemberApplication.
+  // Pure function of (apps, users) — only re-runs when either underlying
+  // query updates.
+  const applications = useMemo(() => {
     const appUserIds = new Set(apps.map(a => a.user_id).filter(Boolean));
     const pendingUsers = users.filter(
       u => (u.onboarding_step === "pending_approval" || u.member_status === "pending") && !appUserIds.has(u.id)
@@ -56,13 +69,23 @@ export default function AdminDashboard({ user }) {
       status: "pending",
       _synthetic: true,
     }));
+    return [...apps, ...syntheticApps];
+  }, [apps, users]);
 
-    setApplications([...apps, ...syntheticApps]);
-    setMembers(users.filter(u => u.role && u.role !== "admin" && u.role !== "pending"));
-    setDeals(deals_);
-    setMessages(threads);
-    setReviews(revs);
-    setLoading(false);
+  // Members for role breakdown (excludes admins and pending users).
+  const members = useMemo(
+    () => users.filter(u => u.role && u.role !== "admin" && u.role !== "pending"),
+    [users]
+  );
+
+  const loading = loadingApps || loadingUsers || loadingDeals;
+
+  // Invalidate both MemberApplication and User after approve/reject —
+  // approval changes a user's role, so other admin views reading the User
+  // cache must refresh.
+  const refreshAfterMutation = () => {
+    queryClient.invalidateQueries({ queryKey: ['MemberApplication'] });
+    queryClient.invalidateQueries({ queryKey: ['User'] });
   };
 
   const handleAction = async (appId, action) => {
@@ -99,7 +122,7 @@ export default function AdminDashboard({ user }) {
     } catch (e) {}
     toast.success(`Application ${action}`);
     setProcessing(null);
-    load();
+    refreshAfterMutation();
   };
 
   const pending = applications.filter(a => a.status === "pending");
