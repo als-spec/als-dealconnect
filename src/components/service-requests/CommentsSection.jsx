@@ -58,6 +58,9 @@ export default function CommentsSection({ request, currentUser, onUpdated }) {
   };
 
   const comments = request?.comments || [];
+  // Admin is oversight-only (T2.6.2): can read the conversation but
+  // doesn't post comments. TC/investor are the conversation participants.
+  const canPost = currentUser?.role && currentUser.role !== "admin";
 
   return (
     <div>
@@ -91,29 +94,31 @@ export default function CommentsSection({ request, currentUser, onUpdated }) {
           );
         })}
       </div>
-      <div className="flex gap-2">
-        <Textarea
-          value={newComment}
-          onChange={e => setNewComment(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handlePost();
-            }
-          }}
-          placeholder="Add a comment…"
-          className="flex-1 min-h-[40px] max-h-[100px] resize-none text-sm"
-          rows={1}
-        />
-        <button
-          onClick={handlePost}
-          disabled={!newComment.trim() || posting}
-          className="gradient-primary text-white p-2.5 rounded-xl disabled:opacity-40 hover:opacity-90 transition-opacity flex-shrink-0"
-          aria-label="Post comment"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-      </div>
+      {canPost && (
+        <div className="flex gap-2">
+          <Textarea
+            value={newComment}
+            onChange={e => setNewComment(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handlePost();
+              }
+            }}
+            placeholder="Add a comment…"
+            className="flex-1 min-h-[40px] max-h-[100px] resize-none text-sm"
+            rows={1}
+          />
+          <button
+            onClick={handlePost}
+            disabled={!newComment.trim() || posting}
+            className="gradient-primary text-white p-2.5 rounded-xl disabled:opacity-40 hover:opacity-90 transition-opacity flex-shrink-0"
+            aria-label="Post comment"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

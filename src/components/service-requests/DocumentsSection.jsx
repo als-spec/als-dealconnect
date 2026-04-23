@@ -74,28 +74,34 @@ export default function DocumentsSection({ request, currentUser, onUpdated }) {
   };
 
   const documents = request?.documents || [];
+  // Admin is oversight-only (T2.6.2): can see the document list but
+  // doesn't upload documents themselves. TC/investor are the transaction
+  // participants who upload.
+  const canUpload = currentUser?.role && currentUser.role !== "admin";
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <h4 className="font-bold text-navy text-sm">Documents</h4>
-        <div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleUpload}
-            className="hidden"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-1.5 text-xs text-teal font-semibold hover:opacity-80 transition-opacity"
-            aria-label="Upload a document"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            {uploading ? "Uploading…" : "Upload"}
-          </button>
-        </div>
+        {canUpload && (
+          <div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 text-xs text-teal font-semibold hover:opacity-80 transition-opacity"
+              aria-label="Upload a document"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              {uploading ? "Uploading…" : "Upload"}
+            </button>
+          </div>
+        )}
       </div>
       {documents.length === 0 ? (
         <p className="text-sm text-muted-foreground">No documents uploaded yet.</p>
