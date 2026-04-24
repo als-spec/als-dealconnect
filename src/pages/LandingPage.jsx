@@ -8,17 +8,10 @@ import {
   Award,
   DollarSign,
   ArrowRight,
-  ChevronDown,
   ClipboardCheck,
   Building2,
   Landmark,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 
 const MEMBER_CARDS = [
   {
@@ -56,35 +49,10 @@ const TRUST_ITEMS = [
 
 export default function LandingPage({ user }) {
   const navigate = useNavigate();
-  // user prop is passed from App.jsx (already resolved); null = unauthenticated
   const authedUser = user ?? null;
 
-  /**
-   * Redirect an unauthenticated visitor to Base44's login page, preserving
-   * their intent (which role they picked) via the from_url query param.
-   * Base44's login page offers both Sign In and Sign Up for new users;
-   * after auth, Base44 redirects back to the from_url, which lands them
-   * on the correct /onboarding?type=X variant.
-   *
-   * Why not <Link to="/onboarding?type=X">?
-   *   The <Link> pattern triggers a client-side route change first. When
-   *   App.jsx re-renders on that change and sees authError + non-public
-   *   path, it tries to call navigateToLogin() synchronously during
-   *   render — which React silently swallows as an illegal side effect.
-   *   Click appears to do nothing.
-   *
-   *   Calling base44.auth.redirectToLogin() directly from an onClick
-   *   handler runs post-render in event context, where side effects are
-   *   legal. This is the same pattern the working 'Sign In' button uses
-   *   (see header). Proven to work on the deployed app.
-   *
-   * @param {string} [type] - Optional member type ('tc' | 'investor' | 'pml')
-   */
-  const redirectToSignup = (type) => {
-    const target = type
-      ? `${window.location.origin}/onboarding?type=${type}`
-      : `${window.location.origin}/onboarding`;
-    base44.auth.redirectToLogin(target);
+  const handleSignIn = () => {
+    base44.auth.redirectToLogin(window.location.href);
   };
 
   return (
@@ -105,20 +73,12 @@ export default function LandingPage({ user }) {
                 Go to Dashboard
               </button>
             ) : (
-              <>
-                <button
-                  onClick={() => base44.auth.redirectToLogin(window.location.href)}
-                  className="text-sm font-semibold text-navy border border-border px-4 py-2 rounded-lg hover:bg-muted transition-colors"
-                >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => redirectToSignup()}
-                  className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
-                >
-                  Join Now
-                </button>
-              </>
+              <button
+                onClick={handleSignIn}
+                className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
+              >
+                Sign In / Sign Up
+              </button>
             )}
           </div>
         </div>
@@ -151,54 +111,12 @@ export default function LandingPage({ user }) {
                 Go to Dashboard <ArrowRight className="w-4 h-4" />
               </button>
             ) : (
-              <>
-                <button
-                  onClick={() => redirectToSignup("tc")}
-                  className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
-                >
-                  I'm a TC <ArrowRight className="w-4 h-4" />
-                </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="bg-white border-2 border-teal text-teal font-bold px-8 py-3.5 rounded-xl hover:bg-teal/5 transition-all shadow inline-flex items-center gap-2"
-                    >
-                      I'm an Investor or Lender <ChevronDown className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" className="w-64">
-                    <DropdownMenuItem
-                      onSelect={() => redirectToSignup("investor")}
-                      className="py-3 cursor-pointer"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center flex-shrink-0">
-                          <Icon as={Building2} className="w-4 h-4 text-navy" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-navy text-sm">Investor / Agent</p>
-                          <p className="text-xs text-muted-foreground">Post deals, find TCs</p>
-                        </div>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => redirectToSignup("pml")}
-                      className="py-3 cursor-pointer"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center flex-shrink-0">
-                          <Icon as={Landmark} className="w-4 h-4 text-navy" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-navy text-sm">Private Money Lender</p>
-                          <p className="text-xs text-muted-foreground">Fund deals, grow portfolio</p>
-                        </div>
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
+              <button
+                onClick={handleSignIn}
+                className="gradient-primary text-white font-bold px-10 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
+              >
+                Sign In / Sign Up <ArrowRight className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>
@@ -252,7 +170,7 @@ export default function LandingPage({ user }) {
                   </div>
                   {!authedUser && (
                     <button
-                      onClick={() => redirectToSignup(card.type)}
+                      onClick={handleSignIn}
                       className="gradient-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition-all inline-flex items-center gap-2 w-full justify-center"
                     >
                       {card.ctaLabel} <ArrowRight className="w-3.5 h-3.5" />
@@ -271,18 +189,12 @@ export default function LandingPage({ user }) {
           <div className="max-w-2xl mx-auto text-center space-y-5">
             <h2 className="text-2xl font-extrabold text-navy">Ready to get started?</h2>
             <p className="text-slate-text">Already a member? Sign in to access your dashboard. New here? Join the network today.</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="flex justify-center">
               <button
-                onClick={() => base44.auth.redirectToLogin(window.location.href)}
-                className="bg-white border-2 border-navy text-navy font-bold px-8 py-3 rounded-xl hover:bg-navy/5 transition-all inline-flex items-center justify-center gap-2"
+                onClick={handleSignIn}
+                className="gradient-primary text-white font-bold px-10 py-3 rounded-xl hover:opacity-90 transition-all shadow inline-flex items-center justify-center gap-2"
               >
-                Login as a Member
-              </button>
-              <button
-                onClick={() => redirectToSignup()}
-                className="gradient-primary text-white font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-all shadow inline-flex items-center justify-center gap-2"
-              >
-                Join Now <ArrowRight className="w-4 h-4" />
+                Sign In / Sign Up <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -297,7 +209,7 @@ export default function LandingPage({ user }) {
             <div className="flex flex-wrap gap-6 text-sm text-white/60">
               <Link to="/partners" className="hover:text-teal transition-colors">Partners</Link>
               <button
-                onClick={() => redirectToSignup()}
+                onClick={handleSignIn}
                 className="hover:text-teal transition-colors bg-transparent border-0 p-0 text-sm text-white/60 font-inherit cursor-pointer"
               >
                 Join
