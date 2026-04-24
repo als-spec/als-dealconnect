@@ -59,6 +59,34 @@ export default function LandingPage({ user }) {
   // user prop is passed from App.jsx (already resolved); null = unauthenticated
   const authedUser = user ?? null;
 
+  /**
+   * Redirect an unauthenticated visitor to Base44's login page, preserving
+   * their intent (which role they picked) via the from_url query param.
+   * Base44's login page offers both Sign In and Sign Up for new users;
+   * after auth, Base44 redirects back to the from_url, which lands them
+   * on the correct /onboarding?type=X variant.
+   *
+   * Why not <Link to="/onboarding?type=X">?
+   *   The <Link> pattern triggers a client-side route change first. When
+   *   App.jsx re-renders on that change and sees authError + non-public
+   *   path, it tries to call navigateToLogin() synchronously during
+   *   render — which React silently swallows as an illegal side effect.
+   *   Click appears to do nothing.
+   *
+   *   Calling base44.auth.redirectToLogin() directly from an onClick
+   *   handler runs post-render in event context, where side effects are
+   *   legal. This is the same pattern the working 'Sign In' button uses
+   *   (see header). Proven to work on the deployed app.
+   *
+   * @param {string} [type] - Optional member type ('tc' | 'investor' | 'pml')
+   */
+  const redirectToSignup = (type) => {
+    const target = type
+      ? `${window.location.origin}/onboarding?type=${type}`
+      : `${window.location.origin}/onboarding`;
+    base44.auth.redirectToLogin(target);
+  };
+
   return (
     <div className="min-h-screen font-barlow" style={{ backgroundColor: "#e8f0f7" }}>
       {/* Nav */}
@@ -84,12 +112,12 @@ export default function LandingPage({ user }) {
                 >
                   Sign In
                 </button>
-                <Link
-                  to="/onboarding"
+                <button
+                  onClick={() => redirectToSignup()}
                   className="gradient-primary text-white text-sm font-bold px-5 py-2 rounded-lg hover:opacity-90 transition-all shadow"
                 >
                   Join Now
-                </Link>
+                </button>
               </>
             )}
           </div>
@@ -124,12 +152,12 @@ export default function LandingPage({ user }) {
               </button>
             ) : (
               <>
-                <Link
-                  to="/onboarding?type=tc"
+                <button
+                  onClick={() => redirectToSignup("tc")}
                   className="gradient-primary text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
                 >
                   I'm a TC <ArrowRight className="w-4 h-4" />
-                </Link>
+                </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -141,7 +169,7 @@ export default function LandingPage({ user }) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="center" className="w-64">
                     <DropdownMenuItem
-                      onSelect={() => navigate("/onboarding?type=investor")}
+                      onSelect={() => redirectToSignup("investor")}
                       className="py-3 cursor-pointer"
                     >
                       <div className="flex items-start gap-3">
@@ -155,7 +183,7 @@ export default function LandingPage({ user }) {
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onSelect={() => navigate("/onboarding?type=pml")}
+                      onSelect={() => redirectToSignup("pml")}
                       className="py-3 cursor-pointer"
                     >
                       <div className="flex items-start gap-3">
@@ -223,12 +251,12 @@ export default function LandingPage({ user }) {
                     ))}
                   </div>
                   {!authedUser && (
-                    <Link
-                      to={`/onboarding?type=${card.type}`}
+                    <button
+                      onClick={() => redirectToSignup(card.type)}
                       className="gradient-primary text-white text-sm font-bold px-5 py-2.5 rounded-lg hover:opacity-90 transition-all inline-flex items-center gap-2 w-full justify-center"
                     >
                       {card.ctaLabel} <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
+                    </button>
                   )}
                 </div>
               </div>
@@ -250,12 +278,12 @@ export default function LandingPage({ user }) {
               >
                 Login as a Member
               </button>
-              <Link
-                to="/onboarding"
+              <button
+                onClick={() => redirectToSignup()}
                 className="gradient-primary text-white font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-all shadow inline-flex items-center justify-center gap-2"
               >
                 Join Now <ArrowRight className="w-4 h-4" />
-              </Link>
+              </button>
             </div>
           </div>
         </section>
@@ -268,7 +296,12 @@ export default function LandingPage({ user }) {
             <Logo size="md" />
             <div className="flex flex-wrap gap-6 text-sm text-white/60">
               <Link to="/partners" className="hover:text-teal transition-colors">Partners</Link>
-              <Link to="/onboarding" className="hover:text-teal transition-colors">Join</Link>
+              <button
+                onClick={() => redirectToSignup()}
+                className="hover:text-teal transition-colors bg-transparent border-0 p-0 text-sm text-white/60 font-inherit cursor-pointer"
+              >
+                Join
+              </button>
             </div>
           </div>
           <p className="text-center text-white/40 text-sm">
