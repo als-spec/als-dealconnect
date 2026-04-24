@@ -57,7 +57,7 @@ export default function PendingApprovalStep({ memberType, selectedPlan }) {
         </div>
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Phone className="w-4 h-4" />
-          <span>Support: <a href="mailto:support@alsdealconnect.com" className="text-teal font-semibold hover:underline">support@alsdealconnect.com</a></span>
+          <span>Support: <a href="mailto:support@alsdealflow.com" className="text-teal font-semibold hover:underline">support@alsdealflow.com</a></span>
         </div>
       </div>
     </div>
