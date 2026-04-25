@@ -105,17 +105,18 @@ export default function Applications() {
 
     // Email notification — failure here should not roll back the approval
     try {
+      const firstName = (app.full_name || '').split(' ')[0] || app.full_name;
       if (action === "approved") {
         await base44.integrations.Core.SendEmail({
           to: app.email,
-          subject: "Welcome to ALS DealConnect — Your Application is Approved!",
-          body: `Hi ${app.full_name},\n\nGreat news! Your application to join ALS DealConnect as a ${TYPE_LABELS[app.member_type]} has been approved. You can now log in and access the platform.\n\nWelcome aboard!\n\nThe ALS DealConnect Team`,
+          subject: "You're In — Welcome to ALS Deal Connect 🎉",
+          body: `Hi ${firstName},\n\nGreat news — your ALS Deal Connect membership is officially active! We've reviewed your account and you're cleared to start using the platform.\n\nHere's how to hit the ground running:\n\n1. Log In & Complete Your Profile\nHead to your dashboard and complete your ${TYPE_LABELS[app.member_type]} profile. A complete profile helps us surface the right opportunities and connections for you.\n\n2. Explore the Platform\nBrowse active deals, funding opportunities, and connect with investors, lenders, and transaction coordinators in the member directory.\n\n3. Schedule Your Onboarding Call\nBook a complimentary 30-minute onboarding call with our team for a personalized platform walkthrough and answers to any questions you have.\n\n4. Connect with the Community\nIntroduce yourself in the member directory and start building relationships with fellow deal-makers across the ALS Deal Connect network.\n\nAccess your dashboard: https://alsdealflow.com/dashboard\n\nWe're excited to have you on board. If you ever need support, our team is just an email away at support@alsdealflow.com\n\nHere's to great deals,\nThe ALS Deal Connect Team`,
         });
       } else {
         await base44.integrations.Core.SendEmail({
           to: app.email,
-          subject: "ALS DealConnect — Application Update",
-          body: `Hi ${app.full_name},\n\nThank you for applying to ALS DealConnect. After reviewing your application, we are unable to approve your membership at this time.${adminNotes ? `\n\nNote from our team: ${adminNotes}` : ""}\n\nIf you have questions, please reach out to our support team.\n\nThe ALS DealConnect Team`,
+          subject: "ALS Deal Connect — Application Update",
+          body: `Hi ${firstName},\n\nThank you for applying to ALS Deal Connect. After reviewing your application, we are unable to approve your membership at this time.${adminNotes ? `\n\nNote from our team: ${adminNotes}` : ""}\n\nIf you have questions, please reach out to us at support@alsdealflow.com\n\nThe ALS Deal Connect Team`,
         });
       }
     } catch (e) {
