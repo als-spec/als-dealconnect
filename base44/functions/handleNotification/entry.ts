@@ -38,14 +38,16 @@ Deno.serve(async (req) => {
         );
       }
       // Confirm to applicant
+      const applicantFirstName = (data.full_name || '').split(' ')[0] || data.full_name;
       await sendEmail(
         data.email,
-        'Application Received — ALS DealConnect',
-        `<p>Hi ${data.full_name},</p>
-         <p>Thank you for applying to <strong>ALS DealConnect</strong>! We've received your application and our team is reviewing it.</p>
-         <p>You'll receive an email notification once your application has been reviewed (typically within 1-2 business days).</p>
-         <p>If you have any questions in the meantime, don't hesitate to reach out to our support team.</p>
-         <p>Welcome to the ALS DealConnect community!</p>`
+        "You're Subscribed — Your ALS Deal Connect Membership is Under Review",
+        `<p>Hi ${applicantFirstName},</p>
+         <p>Thank you for subscribing to ALS Deal Connect. Your membership payment has been received and we're excited to have you on board.</p>
+         <p>Your account is currently waiting for approval. Our admin team will review and verify your account within 24–48 hours and activate your access once the review is complete.</p>
+         <p>You'll receive a separate welcome email with your dashboard access and onboarding instructions as soon as you're approved.</p>
+         <p>Questions in the meantime? Simply reply to this email — we're happy to help.</p>
+         <p>Looking forward to working with you,<br><strong>The ALS Deal Connect Team</strong></p>`
       );
     }
 
