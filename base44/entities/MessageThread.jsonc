@@ -1,0 +1,44 @@
+{
+  "name": "MessageThread",
+  "type": "object",
+  "properties": {
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "participant_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "subject": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "last_message": {
+      "type": "string"
+    },
+    "last_message_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "unread_by": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "deal_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "participants"
+  ]
+}

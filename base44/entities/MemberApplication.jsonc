@@ -32,6 +32,10 @@
     "selected_plan": {
       "type": "string"
     },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
+    },
     "nda_accepted": {
       "type": "boolean",
       "default": false

@@ -1,0 +1,42 @@
+{
+  "name": "DealApplication",
+  "type": "object",
+  "properties": {
+    "deal_id": {
+      "type": "string"
+    },
+    "tc_id": {
+      "type": "string"
+    },
+    "tc_name": {
+      "type": "string"
+    },
+    "tc_profile_id": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "match_score": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accepted",
+        "declined"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "deal_id",
+    "tc_id",
+    "status"
+  ]
+}
