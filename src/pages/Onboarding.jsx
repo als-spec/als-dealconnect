@@ -141,12 +141,18 @@ export default function Onboarding() {
       non_compete_accepted_date: now,
       non_compete_signer_name: user.full_name,
     });
+    // Invalidate first so the next refetch gets the freshly saved user record
+    await invalidateUser();
     const freshUser = await refetchUser();
     await base44.entities.MemberApplication.create({
+      user_id: freshUser.id,
       email: freshUser.email,
       full_name: freshUser.full_name,
-      member_type: formData.member_type,
-      selected_plan: formData.selected_plan,
+      phone: freshUser.phone || "",
+      company_name: freshUser.company_name || "",
+      state: freshUser.state || "",
+      member_type: formData.member_type || freshUser.member_type,
+      selected_plan: formData.selected_plan || freshUser.selected_plan,
       nda_accepted: true,
       nda_accepted_date: freshUser.nda_accepted_date || now,
       nda_signer_name: freshUser.nda_signer_name || freshUser.full_name,
@@ -154,7 +160,6 @@ export default function Onboarding() {
       non_compete_accepted_date: now,
       non_compete_signer_name: freshUser.full_name,
       status: "pending",
-      user_id: freshUser.id,
     });
     setStep("pending_approval");
   };
