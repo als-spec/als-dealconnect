@@ -36,6 +36,7 @@ export default function PMLProfileEditForm({ profile, onSave, onCancel, saving }
     geographic_markets: profile?.geographic_markets || [],
     is_published: profile?.is_published ?? true,
     is_active: profile?.is_active ?? true,
+    accepting_new_clients: profile?.accepting_new_clients ?? true,
   });
   const [marketInput, setMarketInput] = useState("");
 
@@ -151,7 +152,7 @@ export default function PMLProfileEditForm({ profile, onSave, onCancel, saving }
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-6">
         <div className="flex items-center gap-2">
           <Switch checked={form.is_active} onCheckedChange={(v) => u("is_active", v)} />
           <Label className="text-sm font-medium">Active Lender Status</Label>
@@ -159,6 +160,10 @@ export default function PMLProfileEditForm({ profile, onSave, onCancel, saving }
         <div className="flex items-center gap-2">
           <Switch checked={form.is_published} onCheckedChange={(v) => u("is_published", v)} />
           <Label className="text-sm font-medium">Published in Directory</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={form.accepting_new_clients} onCheckedChange={(v) => u("accepting_new_clients", v)} />
+          <Label className="text-sm font-medium">Accepting New Clients</Label>
         </div>
       </div>
 

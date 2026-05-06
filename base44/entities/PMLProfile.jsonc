@@ -1,0 +1,113 @@
+{
+  "name": "PMLProfile",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "bio": {
+      "type": "string"
+    },
+    "profile_image": {
+      "type": "string"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "preferred",
+        "gold",
+        "platinum"
+      ],
+      "default": "preferred"
+    },
+    "is_verified": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "is_published": {
+      "type": "boolean",
+      "default": false
+    },
+    "accepting_new_clients": {
+      "type": "boolean",
+      "default": true
+    },
+    "deals_funded": {
+      "type": "number"
+    },
+    "avg_close_days": {
+      "type": "number"
+    },
+    "loan_min": {
+      "type": "string"
+    },
+    "loan_max": {
+      "type": "string"
+    },
+    "max_ltv": {
+      "type": "string"
+    },
+    "max_arv": {
+      "type": "string"
+    },
+    "rate_min": {
+      "type": "string"
+    },
+    "rate_max": {
+      "type": "string"
+    },
+    "points_min": {
+      "type": "string"
+    },
+    "points_max": {
+      "type": "string"
+    },
+    "term_min": {
+      "type": "string"
+    },
+    "term_max": {
+      "type": "string"
+    },
+    "min_credit_score": {
+      "type": "string"
+    },
+    "prepayment_penalty": {
+      "type": "boolean",
+      "default": false
+    },
+    "loan_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "property_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "geographic_markets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

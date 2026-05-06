@@ -46,9 +46,13 @@ export default function PMLCard({ profile, user }) {
               {profile.tier.charAt(0).toUpperCase() + profile.tier.slice(1)}
             </Badge>
           )}
-          {profile?.is_active && (
+          {profile?.accepting_new_clients ? (
             <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold gap-1">
-              <Zap className="w-3 h-3" /> Active
+              <Zap className="w-3 h-3" /> Accepting Clients
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-xs font-bold">
+              Not Accepting
             </Badge>
           )}
         </div>
