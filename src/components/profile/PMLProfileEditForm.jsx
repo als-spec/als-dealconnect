@@ -163,7 +163,7 @@ export default function PMLProfileEditForm({ profile, onSave, onCancel, saving }
         </div>
         <div className="flex items-center gap-2">
           <Switch checked={form.accepting_new_clients} onCheckedChange={(v) => u("accepting_new_clients", v)} />
-          <Label className="text-sm font-medium">Accepting New Clients</Label>
+          <Label className="text-sm font-medium">Open to Funding New Deals</Label>
         </div>
       </div>
 
