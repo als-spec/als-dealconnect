@@ -69,6 +69,7 @@ export default function Members() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [showIncomplete, setShowIncomplete] = useState(false);
   const [page, setPage] = useState(1);
   const [selectedMember, setSelectedMember] = useState(null);
   const [editData, setEditData] = useState({});
@@ -81,6 +82,15 @@ export default function Members() {
     queryKey: ['User', 'list', { sort: '-created_date', limit: FETCH_CAP }],
     queryFn: () => base44.entities.User.list("-created_date", FETCH_CAP),
   });
+
+  // Users who have completed onboarding (reached pending_approval or approved).
+  // These are the only users the admin should act on by default.
+  const COMPLETED_STEPS = ["pending_approval", "approved"];
+  const completedMembers = members.filter(m =>
+    m.role === "admin" || COMPLETED_STEPS.includes(m.onboarding_step)
+  );
+  const incompleteCount = members.length - completedMembers.length;
+  const visibleMembers = showIncomplete ? members : completedMembers;
 
   const openEdit = (member) => {
     setSelectedMember(member);
@@ -114,7 +124,7 @@ export default function Members() {
   };
 
   const filtered = useMemo(() => {
-    return members.filter((m) => {
+    return visibleMembers.filter((m) => {
       const matchesSearch =
         !search ||
         m.full_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -129,7 +139,7 @@ export default function Members() {
   // admins don't land on a page that no longer exists in the new filter.
   useEffect(() => {
     setPage(1);
-  }, [search, roleFilter]);
+  }, [search, roleFilter, showIncomplete]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages); // clamp in case filter shrinks
@@ -152,6 +162,28 @@ export default function Members() {
       <div>
         <h1 className="text-3xl font-extrabold text-navy">Members</h1>
         <p className="text-muted-foreground mt-1">Manage all platform members</p>
+      </div>
+
+      {/* Onboarding filter banner */}
+      <div className="flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3 text-sm">
+        <div>
+          {showIncomplete ? (
+            <span className="text-muted-foreground">Showing <span className="font-semibold text-navy">all {members.length}</span> registered users, including <span className="font-semibold text-amber-600">{incompleteCount}</span> who have not completed the application flow.</span>
+          ) : (
+            <span className="text-muted-foreground">Showing <span className="font-semibold text-navy">{completedMembers.length}</span> members who completed onboarding &amp; payment. <span className="font-semibold text-amber-600">{incompleteCount}</span> incomplete sign-ups hidden.</span>
+          )}
+        </div>
+        <button
+          onClick={() => setShowIncomplete(v => !v)}
+          className={cn(
+            "ml-4 shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
+            showIncomplete
+              ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
+              : "bg-muted border-border text-muted-foreground hover:border-teal/40"
+          )}
+        >
+          {showIncomplete ? "Hide incomplete" : "Show incomplete sign-ups"}
+        </button>
       </div>
 
       {nearCap && (
@@ -201,6 +233,7 @@ export default function Members() {
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Role</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Plan</th>
+                <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Onboarding</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Joined</th>
                 <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
@@ -227,6 +260,9 @@ export default function Members() {
                   <td className="px-5 py-4 hidden md:table-cell text-sm text-muted-foreground">
                     {m.stripe_price_id ? PLAN_LABELS[m.stripe_price_id] || m.stripe_price_id : m.selected_plan || "—"}
                   </td>
+                  <td className="px-5 py-4 hidden lg:table-cell text-sm text-muted-foreground capitalize">
+                    {m.onboarding_step ? m.onboarding_step.replace(/_/g, " ") : "not started"}
+                  </td>
                   <td className="px-5 py-4 hidden lg:table-cell text-sm text-muted-foreground">
                     {m.created_date ? new Date(m.created_date).toLocaleDateString() : "—"}
                   </td>
@@ -239,7 +275,7 @@ export default function Members() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center">
+                  <td colSpan={7} className="px-5 py-12 text-center">
                     <Icon as={Users} className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                     <p className="text-muted-foreground">No members found</p>
                   </td>
