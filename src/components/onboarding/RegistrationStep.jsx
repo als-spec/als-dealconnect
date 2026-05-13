@@ -3,29 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import GradientButton from "../GradientButton";
-import { Building2, User, Briefcase, DollarSign } from "lucide-react";
+import { User } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const MEMBER_TYPES = [
-  {
-    value: "tc",
-    label: "Transaction Coordinator",
-    description: "Manage and coordinate real estate transactions",
-    icon: Briefcase,
-  },
-  {
-    value: "investor",
-    label: "Investor / Agent",
-    description: "Post deals and find coordination services",
-    icon: Building2,
-  },
-  {
-    value: "pml",
-    label: "Private Money Lender",
-    description: "Provide funding for real estate deals",
-    icon: DollarSign,
-  },
-];
 
 const US_STATES = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
@@ -38,6 +17,23 @@ const US_STATES = [
   "Wisconsin","Wyoming"
 ];
 
+const EXPERTISE_OPTIONS = [
+  "Subject-To (Sub2)",
+  "Seller Finance",
+  "Wraps",
+  "Fix & Flip",
+  "DSCR",
+  "Creative Finance",
+  "Wholesale",
+  "Ground-Up Construction",
+  "Short-Term Rental",
+  "Bridge Loans",
+  "Lease Option",
+  "Multi-Family",
+  "Commercial",
+  "Land",
+];
+
 export default function RegistrationStep({ data, onUpdate, onNext }) {
   const [errors, setErrors] = useState({});
 
@@ -46,7 +42,6 @@ export default function RegistrationStep({ data, onUpdate, onNext }) {
     if (!data.phone) errs.phone = "Phone is required";
     if (!data.company_name) errs.company_name = "Company name is required";
     if (!data.state) errs.state = "State is required";
-    if (!data.member_type) errs.member_type = "Please select a member type";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -56,6 +51,14 @@ export default function RegistrationStep({ data, onUpdate, onNext }) {
     if (validate()) onNext();
   };
 
+  const toggleExpertise = (area) => {
+    const current = data.expertise_areas || [];
+    const updated = current.includes(area)
+      ? current.filter((a) => a !== area)
+      : [...current, area];
+    onUpdate({ expertise_areas: updated });
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       <div className="text-center mb-8">
@@ -63,12 +66,13 @@ export default function RegistrationStep({ data, onUpdate, onNext }) {
           <User className="w-7 h-7 text-white" />
         </div>
         <h2 className="text-2xl font-bold text-navy">Complete Your Profile</h2>
-        <p className="text-slate-text mt-1">Tell us about yourself and your role</p>
+        <p className="text-slate-text mt-1">Tell us a bit more about yourself</p>
       </div>
 
+      {/* Phone + Company */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="space-y-2">
-          <Label className="text-navy font-semibold">Phone Number</Label>
+          <Label className="text-navy font-semibold">Phone Number <span className="text-destructive">*</span></Label>
           <Input
             placeholder="(555) 123-4567"
             value={data.phone || ""}
@@ -78,7 +82,7 @@ export default function RegistrationStep({ data, onUpdate, onNext }) {
           {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
         </div>
         <div className="space-y-2">
-          <Label className="text-navy font-semibold">Company Name</Label>
+          <Label className="text-navy font-semibold">Company Name <span className="text-destructive">*</span></Label>
           <Input
             placeholder="Your company or brokerage"
             value={data.company_name || ""}
@@ -89,52 +93,58 @@ export default function RegistrationStep({ data, onUpdate, onNext }) {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-navy font-semibold">State / Location</Label>
-        <Select value={data.state || ""} onValueChange={(v) => onUpdate({ state: v })}>
-          <SelectTrigger className={cn("bg-white", errors.state && "border-destructive")}>
-            <SelectValue placeholder="Select your state" />
-          </SelectTrigger>
-          <SelectContent>
-            {US_STATES.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.state && <p className="text-sm text-destructive">{errors.state}</p>}
+      {/* Website + State */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="space-y-2">
+          <Label className="text-navy font-semibold">Website <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+          <Input
+            placeholder="https://yourwebsite.com"
+            value={data.website || ""}
+            onChange={(e) => onUpdate({ website: e.target.value })}
+            className="bg-white border-border"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-navy font-semibold">State / Location <span className="text-destructive">*</span></Label>
+          <Select value={data.state || ""} onValueChange={(v) => onUpdate({ state: v })}>
+            <SelectTrigger className={cn("bg-white", errors.state && "border-destructive")}>
+              <SelectValue placeholder="Select your state" />
+            </SelectTrigger>
+            <SelectContent>
+              {US_STATES.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.state && <p className="text-sm text-destructive">{errors.state}</p>}
+        </div>
       </div>
 
+      {/* Expertise Areas */}
       <div className="space-y-3">
-        <Label className="text-navy font-semibold">I am a...</Label>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {MEMBER_TYPES.map((type) => {
-            const Icon = type.icon;
-            const selected = data.member_type === type.value;
+        <Label className="text-navy font-semibold">
+          Areas of Expertise <span className="text-muted-foreground text-xs font-normal">(select all that apply)</span>
+        </Label>
+        <div className="flex flex-wrap gap-2">
+          {EXPERTISE_OPTIONS.map((area) => {
+            const selected = (data.expertise_areas || []).includes(area);
             return (
               <button
                 type="button"
-                key={type.value}
-                onClick={() => onUpdate({ member_type: type.value })}
+                key={area}
+                onClick={() => toggleExpertise(area)}
                 className={cn(
-                  "flex flex-col items-center text-center p-5 rounded-xl border-2 transition-all duration-200",
+                  "px-3 py-1.5 rounded-full text-sm font-semibold border-2 transition-all duration-150",
                   selected
-                    ? "border-teal bg-teal/5 shadow-md"
-                    : "border-border bg-white hover:border-teal/40 hover:shadow-sm"
+                    ? "gradient-primary text-white border-transparent shadow"
+                    : "bg-white border-border text-muted-foreground hover:border-teal/40"
                 )}
               >
-                <div className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors",
-                  selected ? "gradient-primary" : "bg-muted"
-                )}>
-                  <Icon className={cn("w-6 h-6", selected ? "text-white" : "text-muted-foreground")} />
-                </div>
-                <span className="font-bold text-navy text-sm">{type.label}</span>
-                <span className="text-xs text-muted-foreground mt-1">{type.description}</span>
+                {area}
               </button>
             );
           })}
         </div>
-        {errors.member_type && <p className="text-sm text-destructive">{errors.member_type}</p>}
       </div>
 
       <div className="flex justify-end pt-4">

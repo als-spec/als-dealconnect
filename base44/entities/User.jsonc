@@ -28,8 +28,17 @@
     "company_name": {
       "type": "string"
     },
+    "website": {
+      "type": "string"
+    },
     "state": {
       "type": "string"
+    },
+    "expertise_areas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "member_type": {
       "type": "string"

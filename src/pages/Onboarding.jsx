@@ -5,11 +5,12 @@ import { useRefetchCurrentUser, useInvalidateCurrentUser } from "@/hooks/useCurr
 import Logo from "../components/Logo";
 import OnboardingProgress from "../components/onboarding/OnboardingProgress";
 import MemberTypeStep from "../components/onboarding/MemberTypeStep";
+import RegistrationStep from "../components/onboarding/RegistrationStep";
 import PlanSelectionStep from "../components/onboarding/PlanSelectionStep";
 import NDAStep from "../components/onboarding/NDAStep";
 import NonCompeteStep from "../components/onboarding/NonCompeteStep";
 import PendingApprovalStep from "../components/onboarding/PendingApprovalStep";
-// Registration step removed per spec — flow: member_type → plan → stripe → nda → non_compete → pending
+// Flow: member_type → registration → plan → stripe → nda → non_compete → pending
 
 
 
@@ -23,6 +24,11 @@ export default function Onboarding() {
   const [formData, setFormData] = useState({
     member_type: "",
     selected_plan: "",
+    phone: "",
+    company_name: "",
+    website: "",
+    state: "",
+    expertise_areas: [],
   });
 
   useEffect(() => {
@@ -58,6 +64,11 @@ export default function Onboarding() {
     setFormData({
       member_type: preselectedType || user.member_type || "",
       selected_plan: user.selected_plan || "",
+      phone: user.phone || "",
+      company_name: user.company_name || "",
+      website: user.website || "",
+      state: user.state || "",
+      expertise_areas: user.expertise_areas || [],
     });
 
     if (paymentStatus === "success") {
@@ -104,6 +115,19 @@ export default function Onboarding() {
   const handleMemberTypeNext = async () => {
     await base44.auth.updateMe({
       member_type: formData.member_type,
+      onboarding_step: "registration",
+    });
+    await invalidateUser();
+    setStep("registration");
+  };
+
+  const handleRegistrationNext = async () => {
+    await base44.auth.updateMe({
+      phone: formData.phone,
+      company_name: formData.company_name,
+      website: formData.website,
+      state: formData.state,
+      expertise_areas: formData.expertise_areas,
       onboarding_step: "plan_selection",
     });
     await invalidateUser();
@@ -150,6 +174,8 @@ export default function Onboarding() {
       full_name: freshUser.full_name,
       phone: freshUser.phone || "",
       company_name: freshUser.company_name || "",
+      website: freshUser.website || "",
+      expertise_areas: freshUser.expertise_areas || [],
       state: freshUser.state || "",
       member_type: formData.member_type || freshUser.member_type,
       selected_plan: formData.selected_plan || freshUser.selected_plan,
@@ -201,6 +227,13 @@ export default function Onboarding() {
               selected={formData.member_type}
               onSelect={(val) => updateForm({ member_type: val })}
               onNext={handleMemberTypeNext}
+            />
+          )}
+          {step === "registration" && (
+            <RegistrationStep
+              data={formData}
+              onUpdate={updateForm}
+              onNext={handleRegistrationNext}
             />
           )}
           {(step === "plan_selection" || step === "checkout") && (

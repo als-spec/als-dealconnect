@@ -244,15 +244,31 @@ export default function Applications() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-muted-foreground">Name:</span> <span className="font-semibold text-navy">{selectedApp.full_name}</span></div>
                 <div><span className="text-muted-foreground">Email:</span> <span className="font-semibold text-navy">{selectedApp.email}</span></div>
-                <div><span className="text-muted-foreground">Phone:</span> <span className="font-semibold text-navy">{selectedApp.phone}</span></div>
-                <div><span className="text-muted-foreground">Company:</span> <span className="font-semibold text-navy">{selectedApp.company_name}</span></div>
-                <div><span className="text-muted-foreground">State:</span> <span className="font-semibold text-navy">{selectedApp.state}</span></div>
+                <div><span className="text-muted-foreground">Phone:</span> <span className="font-semibold text-navy">{selectedApp.phone || "—"}</span></div>
+                <div><span className="text-muted-foreground">Company:</span> <span className="font-semibold text-navy">{selectedApp.company_name || "—"}</span></div>
+                <div><span className="text-muted-foreground">State:</span> <span className="font-semibold text-navy">{selectedApp.state || "—"}</span></div>
                 <div><span className="text-muted-foreground">Type:</span> <span className="font-semibold text-navy">{TYPE_LABELS[selectedApp.member_type]}</span></div>
-                <div><span className="text-muted-foreground">Plan:</span> <span className="font-semibold text-navy capitalize">{selectedApp.selected_plan}</span></div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Website:</span>{" "}
+                  {selectedApp.website ? (
+                    <a href={selectedApp.website} target="_blank" rel="noopener noreferrer" className="font-semibold text-teal underline">{selectedApp.website}</a>
+                  ) : <span className="font-semibold text-navy">—</span>}
+                </div>
+                <div><span className="text-muted-foreground">Plan:</span> <span className="font-semibold text-navy capitalize">{selectedApp.selected_plan || "—"}</span></div>
                 <div><span className="text-muted-foreground">NDA:</span> <span className="font-semibold text-navy">{selectedApp.nda_accepted ? `Accepted ${selectedApp.nda_accepted_date ? new Date(selectedApp.nda_accepted_date).toLocaleString() : ""}` : "Not Accepted"}</span></div>
                 <div className="col-span-2"><span className="text-muted-foreground">NDA Signer:</span> <span className="font-semibold text-navy">{selectedApp.nda_signer_name || "—"}</span></div>
                 <div><span className="text-muted-foreground">Non-Compete:</span> <span className="font-semibold text-navy">{selectedApp.non_compete_accepted ? `Accepted ${selectedApp.non_compete_accepted_date ? new Date(selectedApp.non_compete_accepted_date).toLocaleString() : ""}` : "Not Accepted"}</span></div>
                 <div><span className="text-muted-foreground">NC Signer:</span> <span className="font-semibold text-navy">{selectedApp.non_compete_signer_name || "—"}</span></div>
+                {selectedApp.expertise_areas?.length > 0 && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Expertise:</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {selectedApp.expertise_areas.map((area) => (
+                        <span key={area} className="bg-teal/10 text-teal border border-teal/20 text-xs font-semibold px-2 py-0.5 rounded-full">{area}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

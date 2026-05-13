@@ -18,6 +18,15 @@
     "company_name": {
       "type": "string"
     },
+    "website": {
+      "type": "string"
+    },
+    "expertise_areas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "state": {
       "type": "string"
     },
