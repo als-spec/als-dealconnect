@@ -132,23 +132,22 @@ export default function PartnersPage({ user }) {
       <section className="px-6 pb-8">
         <div className="max-w-6xl mx-auto flex flex-wrap gap-3 justify-center">
           {TIERS.map((t) => {
-            const style = t === "All" ? null : TIER_STYLES[t.toLowerCase()];
             const active = filter === t;
+            const activeClass =
+              t === "All" ? "gradient-primary text-white border-transparent shadow-md" :
+              t === "Platinum" ? "bg-teal/10 text-teal border-teal/40 shadow-sm" :
+              t === "Gold" ? "bg-amber-50 text-amber-600 border-amber-300 shadow-sm" :
+              "bg-cyan/10 text-cyan border-cyan/40 shadow-sm";
             return (
               <button
                 key={t}
                 onClick={() => setFilter(t)}
-                className={`px-5 py-2 rounded-full text-sm font-bold border-2 transition-all ${
+                className={`px-5 py-2 rounded-full text-sm font-bold border transition-all ${
                   active
-                    ? t === "All"
-                      ? "border-navy bg-navy text-white"
-                      : `${style.border} bg-white text-navy shadow`
-                    : "border-border bg-white text-slate-text hover:border-navy/30"
+                    ? activeClass
+                    : "border-border bg-white text-muted-foreground hover:border-navy/30 hover:text-navy"
                 }`}
               >
-                {t === "Platinum" && "⭐ "}
-                {t === "Gold" && "🥇 "}
-                {t === "Preferred" && "✅ "}
                 {t}
               </button>
             );
