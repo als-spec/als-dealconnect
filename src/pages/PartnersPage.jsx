@@ -375,14 +375,16 @@ function PartnerCard({ partner }) {
           <p className="text-sm text-slate-text mt-3 leading-relaxed line-clamp-3">{partner.description}</p>
         )}
         {partner.website_url && (
-          <a
-            href={partner.website_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-teal hover:opacity-75 transition-opacity"
-          >
-            Visit Website <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          <div className="mt-4">
+            <a
+              href={partner.website_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal hover:opacity-75 transition-opacity"
+            >
+              Visit Website <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
         )}
 
         {(partner.contact_name || partner.contact_email || partner.contact_phone) && (
