@@ -384,6 +384,30 @@ function PartnerCard({ partner }) {
             Visit Website <ExternalLink className="w-3.5 h-3.5" />
           </a>
         )}
+
+        {(partner.contact_name || partner.contact_email || partner.contact_phone) && (
+          <div className="mt-5 pt-4 border-t border-white/40 space-y-1.5">
+            {partner.contact_name && (
+              <p className="text-xs font-semibold text-navy">{partner.contact_name}</p>
+            )}
+            {partner.contact_email && (
+              <a
+                href={`mailto:${partner.contact_email}`}
+                className="block text-xs text-slate-text hover:text-teal transition-colors truncate"
+              >
+                {partner.contact_email}
+              </a>
+            )}
+            {partner.contact_phone && (
+              <a
+                href={`tel:${partner.contact_phone}`}
+                className="block text-xs text-slate-text hover:text-teal transition-colors"
+              >
+                {partner.contact_phone}
+              </a>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
