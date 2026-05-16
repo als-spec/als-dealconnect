@@ -43,10 +43,10 @@ export default function PartnersPage({ user }) {
     staleTime: 0,
   });
 
-  // Show only active, non-pending-application partners
+  // Mirror the admin partition logic exactly:
+  // show partners where application_status is absent (admin-created) or "approved"
   const activePartners = allPartners.filter(
-    (p) => p.is_active === true &&
-      (!p.application_status || p.application_status === "approved")
+    (p) => !p.application_status || p.application_status === "approved"
   );
 
   const filtered = filter === "All"
