@@ -59,15 +59,17 @@ export default function AdminPartners() {
     try {
       if (editing) {
         await base44.entities.Partner.update(editing, form);
-        toast.success("Partner updated");
+        toast.success("Partner updated successfully");
       } else {
         await base44.entities.Partner.create(form);
-        toast.success("Partner added");
+        toast.success("Partner added successfully");
       }
       setShowForm(false);
       refreshPartners();
     } catch (e) {
-      toast.error("Failed to save partner. Please try again.");
+      toast.error("Failed to save partner.", {
+        action: { label: "Retry", onClick: () => save() },
+      });
     } finally {
       setSaving(false);
     }
@@ -80,7 +82,9 @@ export default function AdminPartners() {
       toast.success("Partner removed");
       refreshPartners();
     } catch (e) {
-      toast.error("Failed to remove partner.");
+      toast.error("Failed to remove partner.", {
+        action: { label: "Retry", onClick: () => remove(id) },
+      });
     }
   };
 
@@ -115,7 +119,9 @@ export default function AdminPartners() {
       setReviewApp(null);
       refreshPartners();
     } catch (e) {
-      toast.error("Failed to approve application. Please try again.");
+      toast.error("Failed to approve application.", {
+        action: { label: "Retry", onClick: () => handleApprove() },
+      });
     } finally {
       setProcessing(false);
     }
@@ -145,7 +151,9 @@ export default function AdminPartners() {
       setReviewApp(null);
       refreshPartners();
     } catch (e) {
-      toast.error("Failed to reject application. Please try again.");
+      toast.error("Failed to reject application.", {
+        action: { label: "Retry", onClick: () => handleReject(appOverride) },
+      });
     } finally {
       setProcessing(false);
     }
