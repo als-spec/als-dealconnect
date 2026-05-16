@@ -36,16 +36,17 @@ export default function PartnersPage({ user }) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
-  // Active partners for the public directory. Public page — no auth needed.
-  const { data: partners = [], isLoading: loading } = useQuery({
-    queryKey: ['Partner', { is_active: true }],
-    queryFn: () => base44.entities.Partner.filter({ is_active: true }),
+  // Fetch ALL partners and filter client-side — avoids boolean filter reliability issues
+  const { data: allPartners = [], isLoading: loading } = useQuery({
+    queryKey: ['Partner', 'public'],
+    queryFn: () => base44.entities.Partner.list(),
     staleTime: 0,
   });
 
-  // Exclude pending/rejected applications — only show admin-added or approved partners
-  const activePartners = partners.filter(
-    (p) => !p.application_status || p.application_status === "approved"
+  // Show only active, non-pending-application partners
+  const activePartners = allPartners.filter(
+    (p) => p.is_active === true &&
+      (!p.application_status || p.application_status === "approved")
   );
 
   const filtered = filter === "All"
