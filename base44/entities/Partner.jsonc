@@ -1,6 +1,12 @@
 {
   "name": "Partner",
   "type": "object",
+  "rls": {
+    "read": "public",
+    "create": "authenticated",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "company_name": {
       "type": "string"
