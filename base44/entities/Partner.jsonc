@@ -1,0 +1,66 @@
+{
+  "name": "Partner",
+  "type": "object",
+  "properties": {
+    "company_name": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Title Company",
+        "Private Lender",
+        "Legal",
+        "PropTech",
+        "Insurance",
+        "Document Services",
+        "Other"
+      ]
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "platinum",
+        "gold",
+        "preferred"
+      ],
+      "default": "preferred"
+    },
+    "description": {
+      "type": "string"
+    },
+    "website_url": {
+      "type": "string"
+    },
+    "logo_color": {
+      "type": "string",
+      "default": "#1432c8"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "application_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ]
+    },
+    "contact_name": {
+      "type": "string"
+    },
+    "contact_email": {
+      "type": "string"
+    },
+    "contact_phone": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_name",
+    "category",
+    "tier"
+  ]
+}
