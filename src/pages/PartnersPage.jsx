@@ -36,23 +36,17 @@ export default function PartnersPage({ user }) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
-  // Fetch ALL partners — no server-side filters, all filtering done client-side
+  // Fetch via backend function (service role) so unauthenticated visitors can read partners
   const { data: allPartners = [], isLoading: loading } = useQuery({
-    queryKey: ['Partner', 'public-v2'],
-    queryFn: () => base44.entities.Partner.list(),
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    queryKey: ['Partner', 'public-v3'],
+    queryFn: async () => {
+      const res = await base44.functions.invoke('getPublicPartners', {});
+      return res.data?.partners ?? [];
+    },
+    staleTime: 60_000,
   });
 
-  // Show all partners that are not pending/rejected applications.
-  // Admin-created partners have no application_status at all — include those too.
-  const activePartners = allPartners.filter((p) => {
-    // Exclude only records that are explicitly pending or rejected applications
-    if (p.application_status === "pending" || p.application_status === "rejected") return false;
-    return true;
-  });
+  const activePartners = allPartners;
 
   const filtered = filter === "All"
     ? activePartners
@@ -168,12 +162,7 @@ export default function PartnersPage({ user }) {
               <div className="w-8 h-8 border-4 border-muted border-t-teal rounded-full animate-spin" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-20 space-y-2">
-              <p className="text-muted-foreground">No partners found.</p>
-              <p className="text-xs text-muted-foreground/60">
-                (Total fetched: {allPartners.length} | After filter: {activePartners.length})
-              </p>
-            </div>
+            <p className="text-center text-muted-foreground py-20">No partners found.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filtered.map((partner) => (
