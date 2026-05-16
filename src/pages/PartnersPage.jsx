@@ -340,8 +340,6 @@ const TIER_GLASS = {
 function PartnerCard({ partner }) {
   const tier = TIER_STYLES[partner.tier] || TIER_STYLES.preferred;
   const tierGlass = TIER_GLASS[partner.tier] || TIER_GLASS.preferred;
-  const logoColor = partner.logo_color || "#1432c8";
-  const initials = partner.company_name?.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
   return (
     <div
@@ -364,16 +362,11 @@ function PartnerCard({ partner }) {
         e.currentTarget.style.border = "1px solid rgba(255,255,255,0.35)";
       }}
     >
-      {/* Logo panel */}
-      <div className="relative h-28 flex items-center justify-center" style={{ backgroundColor: logoColor }}>
-        <span className="text-3xl font-extrabold text-white/90 tracking-tight">{initials}</span>
-        <span className={`absolute top-3 right-3 text-xs font-semibold px-2.5 py-0.5 rounded-full border backdrop-blur-sm bg-white/80 ${tierGlass}`}>
+      {/* Content */}
+      <div className="p-6 relative">
+        <span className={`absolute top-4 right-4 text-xs font-semibold px-2.5 py-0.5 rounded-full border backdrop-blur-sm bg-white/80 ${tierGlass}`}>
           {tier.label}
         </span>
-      </div>
-
-      {/* Content */}
-      <div className="p-6">
         <h3 className="text-lg font-extrabold text-navy mb-1 leading-snug">{partner.company_name}</h3>
         <span className="text-xs font-medium text-slate-text/80 tracking-wide uppercase">
           {partner.category}
