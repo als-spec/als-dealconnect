@@ -40,11 +40,17 @@ export default function PartnersPage({ user }) {
   const { data: partners = [], isLoading: loading } = useQuery({
     queryKey: ['Partner', { is_active: true }],
     queryFn: () => base44.entities.Partner.filter({ is_active: true }),
+    staleTime: 0,
   });
 
+  // Exclude pending/rejected applications — only show admin-added or approved partners
+  const activePartners = partners.filter(
+    (p) => !p.application_status || p.application_status === "approved"
+  );
+
   const filtered = filter === "All"
-    ? partners
-    : partners.filter((p) => p.tier === filter.toLowerCase());
+    ? activePartners
+    : activePartners.filter((p) => p.tier === filter.toLowerCase());
 
   const openApply = () => { setForm(EMPTY_FORM); setSubmitted(false); setError(""); setShowApply(true); };
   const closeApply = () => setShowApply(false);
