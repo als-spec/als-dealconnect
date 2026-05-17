@@ -63,13 +63,8 @@ export default function PartnersPage({ user }) {
     setSubmitting(true);
     setError("");
     try {
-      await base44.entities.Partner.create({
-        ...form,
-        is_active: false,
-        application_status: "pending",
-        tier: "preferred",
-        logo_color: "#1432c8",
-      });
+      const res = await base44.functions.invoke('submitPartnerApplication', form);
+      if (res.data?.error) throw new Error(res.data.error);
       setSubmitted(true);
     } catch (e) {
       setError("Failed to submit your application. Please try again.");
