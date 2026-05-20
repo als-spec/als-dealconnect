@@ -57,11 +57,16 @@ export default function InvestorProfilePage() {
 
   const handleSave = async (formData) => {
     setSaving(true);
+    const data = {
+      ...formData,
+      full_name: currentUser.full_name || "",
+      company_name: currentUser.company_name || formData.company_name || "",
+    };
     try {
       if (profile?.id) {
-        await base44.entities.InvestorProfile.update(profile.id, formData);
+        await base44.entities.InvestorProfile.update(profile.id, data);
       } else {
-        await base44.entities.InvestorProfile.create({ ...formData, user_id: currentUser.id });
+        await base44.entities.InvestorProfile.create({ ...data, user_id: currentUser.id });
       }
     } catch (e) {
       console.error("InvestorProfile save failed:", e);

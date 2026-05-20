@@ -63,6 +63,8 @@ export default function TCProfilePage() {
       years_experience: Number(formData.years_experience) || 0,
       deals_closed: Number(formData.deals_closed) || 0,
       response_rate: Number(formData.response_rate) || 0,
+      full_name: currentUser.full_name || "",
+      company_name: currentUser.company_name || "",
     };
     try {
       if (profile?.id) {

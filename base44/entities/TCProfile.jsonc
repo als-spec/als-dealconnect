@@ -1,0 +1,86 @@
+{
+  "name": "TCProfile",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "full_name": {
+      "type": "string"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "bio": {
+      "type": "string"
+    },
+    "profile_image": {
+      "type": "string"
+    },
+    "years_experience": {
+      "type": "number"
+    },
+    "deals_closed": {
+      "type": "number"
+    },
+    "response_rate": {
+      "type": "number"
+    },
+    "average_rating": {
+      "type": "number"
+    },
+    "review_count": {
+      "type": "number"
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "available",
+        "limited",
+        "unavailable"
+      ],
+      "default": "available"
+    },
+    "specialties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "geographic_coverage": {
+      "type": "string"
+    },
+    "certifications": {
+      "type": "string"
+    },
+    "rate_residential": {
+      "type": "string"
+    },
+    "rate_creative_finance": {
+      "type": "string"
+    },
+    "rate_commercial": {
+      "type": "string"
+    },
+    "rate_rush": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "is_verified": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_published": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

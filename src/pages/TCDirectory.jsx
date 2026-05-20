@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import TCCard from "../components/directory/TCCard";
@@ -48,25 +48,11 @@ export default function TCDirectory() {
     queryFn: () => base44.entities.TCProfile.filter({ is_published: true }),
   });
 
-  // TC-role users — only fetch if there are profiles to enrich.
-  const { data: users = [] } = useQuery({
-    queryKey: ['User', { role: 'tc' }],
-    queryFn: () => base44.entities.User.filter({ role: "tc" }),
-    enabled: profiles.length > 0,
-  });
-
-  const userMap = useMemo(() => {
-    const map = {};
-    users.forEach((u) => { map[u.id] = u; });
-    return map;
-  }, [users]);
-
   const loading = loadingProfiles;
 
   const filtered = profiles.filter((p) => {
-    const user = userMap[p.user_id];
-    const name = user?.full_name?.toLowerCase() || "";
-    const company = user?.company_name?.toLowerCase() || "";
+    const name = (p.full_name || "").toLowerCase();
+    const company = (p.company_name || "").toLowerCase();
 
     const matchesSearch = !search ||
       name.includes(search.toLowerCase()) ||
@@ -177,7 +163,7 @@ export default function TCDirectory() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filtered.map((profile) => (
-            <TCCard key={profile.id} profile={profile} user={userMap[profile.user_id]} />
+            <TCCard key={profile.id} profile={profile} user={{ full_name: profile.full_name, company_name: profile.company_name }} />
           ))}
         </div>
       )}

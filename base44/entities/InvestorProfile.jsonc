@@ -1,0 +1,52 @@
+{
+  "name": "InvestorProfile",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "full_name": {
+      "type": "string"
+    },
+    "bio": {
+      "type": "string"
+    },
+    "profile_image": {
+      "type": "string"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "investment_focus": {
+      "type": "string"
+    },
+    "deal_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "target_markets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "deals_posted": {
+      "type": "number"
+    },
+    "tc_connections": {
+      "type": "number"
+    },
+    "is_published": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}
