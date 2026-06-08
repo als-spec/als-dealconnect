@@ -32,6 +32,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     checkAppState();
@@ -96,14 +97,12 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     try {
       const currentUser = await base44.auth.me();
-      // Prime the react-query cache. useCurrentUser() everywhere else in
-      // the app uses the same queryKey — this eliminates the redundant
-      // second fetch that happened before this refactor (once here, once
-      // in App.jsx's useCurrentUser).
       queryClientInstance.setQueryData(['currentUser'], currentUser);
+      setIsAuthenticated(true);
       setIsLoadingAuth(false);
     } catch (error) {
       console.error('User auth check failed:', error);
+      setIsAuthenticated(false);
       setIsLoadingAuth(false);
       if (error.status === 401 || error.status === 403) {
         setAuthError({ type: 'auth_required', message: 'Authentication required' });
@@ -121,6 +120,7 @@ export const AuthProvider = ({ children }) => {
         isLoadingAuth,
         isLoadingPublicSettings,
         authError,
+        isAuthenticated,
         navigateToLogin,
       }}
     >
