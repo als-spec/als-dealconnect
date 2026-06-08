@@ -1,0 +1,91 @@
+{
+  "name": "Deal",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "investor_id": {
+      "type": "string"
+    },
+    "investor_name": {
+      "type": "string"
+    },
+    "investor_rating": {
+      "type": "number"
+    },
+    "property_address": {
+      "type": "string"
+    },
+    "market": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "property_type": {
+      "type": "string",
+      "enum": [
+        "SFR",
+        "Multi-Family 2-4",
+        "Multi-Family 5+",
+        "Commercial",
+        "Mixed-Use",
+        "Land",
+        "Condo/TH"
+      ]
+    },
+    "deal_type": {
+      "type": "string",
+      "enum": [
+        "Fix & Flip",
+        "DSCR",
+        "Creative Finance",
+        "Wholesale",
+        "Ground-Up Construction",
+        "Short-Term Rental",
+        "Bridge",
+        "Lease Option"
+      ]
+    },
+    "deal_stage": {
+      "type": "string",
+      "enum": [
+        "Under Contract",
+        "Pre-Close",
+        "Closing Soon"
+      ],
+      "default": "Under Contract"
+    },
+    "compensation": {
+      "type": "string"
+    },
+    "compensation_amount": {
+      "type": "number"
+    },
+    "description": {
+      "type": "string"
+    },
+    "closing_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "in_review",
+        "filled",
+        "closed"
+      ],
+      "default": "open"
+    }
+  },
+  "required": [
+    "title",
+    "investor_id",
+    "property_type",
+    "deal_type",
+    "status"
+  ]
+}

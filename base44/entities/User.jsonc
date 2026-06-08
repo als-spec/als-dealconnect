@@ -82,5 +82,26 @@
     "stripe_status": {
       "type": "string"
     }
-  }
+  },
+  "required": [
+    "phone",
+    "company_name",
+    "website",
+    "state",
+    "expertise_areas",
+    "member_type",
+    "selected_plan",
+    "onboarding_step",
+    "nda_accepted",
+    "nda_accepted_date",
+    "nda_signer_name",
+    "non_compete_accepted",
+    "non_compete_accepted_date",
+    "non_compete_signer_name",
+    "stripe_customer_id",
+    "stripe_subscription_id",
+    "stripe_price_id",
+    "stripe_next_billing",
+    "stripe_status"
+  ]
 }

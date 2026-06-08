@@ -1,0 +1,46 @@
+{
+  "name": "Review",
+  "type": "object",
+  "properties": {
+    "tc_profile_id": {
+      "type": "string"
+    },
+    "reviewer_id": {
+      "type": "string"
+    },
+    "reviewer_name": {
+      "type": "string"
+    },
+    "reviewer_company": {
+      "type": "string"
+    },
+    "rating": {
+      "type": "number"
+    },
+    "communication_rating": {
+      "type": "number"
+    },
+    "professionalism_rating": {
+      "type": "number"
+    },
+    "accuracy_rating": {
+      "type": "number"
+    },
+    "timeliness_rating": {
+      "type": "number"
+    },
+    "title": {
+      "type": "string"
+    },
+    "body": {
+      "type": "string"
+    },
+    "deal_type": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "tc_profile_id",
+    "rating"
+  ]
+}

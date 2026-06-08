@@ -1,5 +1,4 @@
 import { Toaster } from "@/components/ui/toaster";
-import { useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
@@ -9,46 +8,25 @@ import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { routesForRole } from "@/lib/routes";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 import Layout from "./components/Layout";
 import Onboarding from "./pages/Onboarding";
 import LandingPage from "./pages/LandingPage";
 import PartnersPage from "./pages/PartnersPage";
-
-/**
- * Fires navigateToLogin() once after mount, then renders nothing.
- *
- * Exists specifically to avoid calling a side effect (window.location
- * redirect) synchronously during render. When we detect an
- * unauthenticated visitor on a non-public path, we return this
- * component instead of calling navigateToLogin() inline — React runs
- * the effect on commit, the redirect fires, and the app is unmounted
- * as the page navigates away.
- *
- * navigateToLogin is passed as a prop rather than pulled via useAuth()
- * so this stays a dumb component with a single responsibility.
- */
-function RedirectToLogin({ navigateToLogin }) {
-  useEffect(() => {
-    navigateToLogin();
-  }, [navigateToLogin]);
-  return null;
-}
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated } = useAuth();
 
-  // Fetch the user once the auth preflight is done and there's no authError.
-  // AuthContext's checkUserAuth pre-warms the react-query cache on successful
-  // bootstrap (via queryClientInstance.setQueryData), so this useCurrentUser
-  // call will hit the cache immediately on first render — no redundant
-  // base44.auth.me() fetch. Every other page's useCurrentUser() hits the
-  // same cache entry.
   const { data: user, isLoading: loadingUser } = useCurrentUser({
-    enabled: !isLoadingAuth && !isLoadingPublicSettings && !authError,
+    enabled: !isLoadingAuth && !isLoadingPublicSettings && !authError && isAuthenticated,
   });
 
-  if (isLoadingPublicSettings || isLoadingAuth || loadingUser) {
+  if (isLoadingPublicSettings || isLoadingAuth || (isAuthenticated && loadingUser)) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-4 border-muted border-t-teal rounded-full animate-spin" />
@@ -56,95 +34,51 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // Paths accessible to unauthenticated visitors when the app's auth
-  // preflight returns auth_required.
-  //
-  // /onboarding is NOT in this list. Even though it's the destination
-  // of every landing-page CTA, unauthenticated users can't complete
-  // the flow — every step handler (handleMemberTypeNext,
-  // handlePlanNext, handleNDAAccept, etc.) calls base44.auth.updateMe
-  // which requires a valid session. Letting unauthenticated users
-  // reach /onboarding results in cascading 403s and a page that
-  // renders but can't advance.
-  //
-  // The correct flow for new users:
-  //   1. Click 'I'm a TC' → navigates to /onboarding?type=tc
-  //   2. App hits this branch: /onboarding not in publicPaths
-  //   3. navigateToLogin() redirects to Base44's login page
-  //   4. Base44's login page has 'Continue with Google' + email/password
-  //      + 'Need an account? Sign up' link
-  //   5. User signs up or signs in; Base44 preserves ?type=tc via from_url
-  //   6. User returns authenticated → /onboarding renders → step handlers
-  //      work because user is now authenticated.
-  const publicPaths = ["/", "/partners"];
-  const currentPath = window.location.pathname;
-
-  if (authError) {
-    if (authError.type === "user_not_registered") {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === "auth_required") {
-      if (publicPaths.includes(currentPath)) {
-        return (
-          <Routes>
-            <Route path="/" element={<LandingPage user={null} />} />
-            <Route path="/partners" element={<PartnersPage user={null} />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        );
-      }
-      // Unauthenticated visitor tried to navigate to a non-public path
-      // (e.g. clicked 'I'm a TC' → /onboarding?type=tc). Redirect them
-      // to Base44's login page, which offers both Sign In and Sign Up
-      // for new users.
-      //
-      // CRITICAL: this has to run in a useEffect, NOT synchronously
-      // during render. Calling navigateToLogin() (which calls
-      // base44.auth.redirectToLogin, which sets window.location) during
-      // render is a side effect that React silently swallows in strict
-      // mode, making the click appear to do nothing while the URL is
-      // mid-change. Running it in useEffect defers to the post-commit
-      // phase where side effects are legal.
-      //
-      // The <Navigate to="/" /> catch-all in the publicPaths branch
-      // above would also fight us here if we rendered it — the URL
-      // would bounce back to / before the effect fired. Returning null
-      // + effect is the correct shape.
-      return <RedirectToLogin navigateToLogin={navigateToLogin} />;
-    }
+  if (authError?.type === "user_not_registered") {
+    return <UserNotRegisteredError />;
   }
 
-  // Only admin users or fully approved members (valid role + onboarding complete) can access the app
+  // Only admin users or fully approved members can access the app
   const validMemberRoles = ["tc", "investor", "pml", "admin"];
   const hasValidRole = validMemberRoles.includes(user?.role);
-  const needsOnboarding = !hasValidRole || (user?.role !== "admin" && user?.onboarding_step !== "approved");
+  const needsOnboarding = isAuthenticated && (!hasValidRole || (user?.role !== "admin" && user?.onboarding_step !== "approved"));
 
-  if (needsOnboarding) {
-    return (
-      <Routes>
-        <Route path="/" element={<LandingPage user={user} />} />
-        <Route path="/partners" element={<PartnersPage user={user} />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="*" element={<Navigate to="/onboarding" replace />} />
-      </Routes>
-    );
-  }
-
-  // Role-scoped authenticated routes — see src/lib/routes.jsx for the
-  // permission matrix. routesForRole returns only the entries visible to
-  // the current user's role.
-  const userRoutes = routesForRole(user?.role);
+  // Role-scoped authenticated routes
+  const userRoutes = user ? routesForRole(user.role) : [];
 
   return (
     <Routes>
+      {/* Public auth routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+
+      {/* Public marketing routes */}
       <Route path="/" element={<LandingPage user={user} />} />
       <Route path="/partners" element={<PartnersPage user={user} />} />
-      <Route element={<Layout user={user} />}>
-        {userRoutes.map(({ path, element }) => (
-          <Route key={path} path={path} element={element} />
-        ))}
-        <Route path="*" element={<PageNotFound />} />
+
+      {/* Onboarding — requires auth but not full approval */}
+      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+        <Route
+          path="/onboarding"
+          element={needsOnboarding ? <Onboarding /> : <Navigate to="/dashboard" replace />}
+        />
       </Route>
-      <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
+
+      {/* App routes — requires auth + approved */}
+      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+        {needsOnboarding ? (
+          <Route path="*" element={<Navigate to="/onboarding" replace />} />
+        ) : (
+          <Route element={<Layout user={user} />}>
+            {userRoutes.map(({ path, element }) => (
+              <Route key={path} path={path} element={element} />
+            ))}
+            <Route path="*" element={<PageNotFound />} />
+          </Route>
+        )}
+      </Route>
     </Routes>
   );
 };
