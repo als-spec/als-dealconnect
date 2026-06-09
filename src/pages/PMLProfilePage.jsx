@@ -10,6 +10,7 @@ import TagPill from "../components/TagPill";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import PostDealForm from "../components/deals/PostDealForm";
 import { MapPin, Building2, ShieldCheck, Pencil, MessageSquare, CheckCircle2, DollarSign, Clock, TrendingUp, Zap, X } from "lucide-react";
 import { toast } from "sonner";
 import { toastMutationError } from "@/lib/toasts";
@@ -33,6 +34,7 @@ export default function PMLProfilePage() {
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [msgSubject, setMsgSubject] = useState("");
   const [sendingMsg, setSendingMsg] = useState(false);
+  const [showDealModal, setShowDealModal] = useState(false);
 
   const isOwnProfile = !profileUserId || profileUserId === currentUser?.id;
   const targetId = profileUserId || currentUser?.id;
@@ -181,7 +183,7 @@ export default function PMLProfilePage() {
                         <MessageSquare className="w-4 h-4" /> Send Message
                       </Button>
                       {isInvestor && (
-                        <GradientButton className="gap-2">Submit a Deal</GradientButton>
+                        <GradientButton className="gap-2" onClick={() => setShowDealModal(true)}>Submit a Deal</GradientButton>
                       )}
                     </>
                   )}
@@ -263,7 +265,7 @@ export default function PMLProfilePage() {
               {profile && <PMLLendingCriteria profile={profile} />}
 
               {isInvestor && (
-                <GradientButton className="w-full text-sm py-3 text-center justify-center">
+                <GradientButton className="w-full text-sm py-3 text-center justify-center" onClick={() => setShowDealModal(true)}>
                   Submit a Deal to This Lender
                 </GradientButton>
               )}
@@ -278,6 +280,29 @@ export default function PMLProfilePage() {
           </div>
         </>
       )}
+    {showDealModal && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-card z-10">
+            <div>
+              <h3 className="font-bold text-navy text-lg">Submit a Deal</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Post a deal for {displayName} to review</p>
+            </div>
+            <button onClick={() => setShowDealModal(false)}>
+              <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+            </button>
+          </div>
+          <div className="p-6">
+            <PostDealForm
+              user={currentUser}
+              onSave={() => { setShowDealModal(false); toast.success("Deal posted successfully!"); }}
+              onCancel={() => setShowDealModal(false)}
+            />
+          </div>
+        </div>
+      </div>
+    )}
+
     {showMessageModal && (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-card rounded-2xl p-6 w-full max-w-md border border-border shadow-xl">
