@@ -48,30 +48,37 @@ export default function ServiceRequests() {
     return allRequests.filter(r => r.tc_id === user.id || r.investor_id === user.id);
   }, [allRequests, user]);
 
-  // Counterparties for the new-request modal. Role-scoped server-side
-  // (from T2.3): TCs see investors, investors see TCs, admins see all
-  // approved members.
-  //
-  // The queryKey includes the user's role so the cache key changes when
-  // the role does (e.g., after an admin-initiated role change). Without
-  // this, a role change wouldn't flip the visible counterparty list until
-  // a manual invalidation.
-  const counterpartyFilter = useMemo(() => {
-    if (user?.role === "tc") return { role: "investor" };
-    if (user?.role === "investor") return { role: "tc" };
-    return { member_status: "approved" };
-  }, [user?.role]);
-
-  const { data: allCounterparties = [] } = useQuery({
-    queryKey: ['User', counterpartyFilter],
-    queryFn: () => base44.entities.User.filter(counterpartyFilter),
-    enabled: !!user?.id,
+  // For investors: fetch published TC profiles to populate the TC dropdown.
+  // User.filter by role is restricted by RLS for non-admin users, so we
+  // use TCProfile (publicly readable) instead.
+  const { data: tcProfiles = [] } = useQuery({
+    queryKey: ['TCProfile', { is_published: true }],
+    queryFn: () => base44.entities.TCProfile.filter({ is_published: true }),
+    enabled: !!user?.id && user?.role === "investor",
   });
 
-  const counterparties = useMemo(
-    () => (user ? allCounterparties.filter(u => u.id !== user.id) : []),
-    [allCounterparties, user]
-  );
+  // For TCs: fetch published InvestorProfiles similarly.
+  const { data: investorProfiles = [] } = useQuery({
+    queryKey: ['InvestorProfile', { is_published: true }],
+    queryFn: () => base44.entities.InvestorProfile.filter({ is_published: true }),
+    enabled: !!user?.id && user?.role === "tc",
+  });
+
+  // Build counterparties list shaped as { id, full_name, email } for the modal.
+  const counterparties = useMemo(() => {
+    if (!user) return [];
+    if (user.role === "investor") {
+      return tcProfiles
+        .filter(p => p.user_id !== user.id)
+        .map(p => ({ id: p.user_id, full_name: p.full_name || "Unnamed TC" }));
+    }
+    if (user.role === "tc") {
+      return investorProfiles
+        .filter(p => p.user_id !== user.id)
+        .map(p => ({ id: p.user_id, full_name: p.full_name || "Unnamed Investor" }));
+    }
+    return [];
+  }, [user, tcProfiles, investorProfiles]);
 
   const handleSelectRequest = (request) => {
     setSelected(request);
