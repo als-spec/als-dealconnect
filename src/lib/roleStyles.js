@@ -53,6 +53,7 @@ export const STATUS_DOT_COLORS = {
   pending: BRAND.amber,
   approved: BRAND.teal,
   rejected: BRAND.gray,
+  suspended: "#dc2626",
 };
 
 /**

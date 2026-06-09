@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { routesForRole } from "@/lib/routes";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { base44 } from "@/api/base44Client";
 
 import Layout from "./components/Layout";
 import Onboarding from "./pages/Onboarding";
@@ -41,7 +42,8 @@ const AuthenticatedApp = () => {
   // Only admin users or fully approved members can access the app
   const validMemberRoles = ["tc", "investor", "pml", "admin"];
   const hasValidRole = validMemberRoles.includes(user?.role);
-  const needsOnboarding = isAuthenticated && (!hasValidRole || (user?.role !== "admin" && user?.onboarding_step !== "approved"));
+  const isSuspended = isAuthenticated && user?.member_status === "suspended";
+  const needsOnboarding = isAuthenticated && !isSuspended && (!hasValidRole || (user?.role !== "admin" && user?.onboarding_step !== "approved"));
 
   // Role-scoped authenticated routes
   const userRoutes = user ? routesForRole(user.role) : [];
@@ -58,15 +60,34 @@ const AuthenticatedApp = () => {
       <Route path="/" element={<LandingPage user={user} />} />
       <Route path="/partners" element={<PartnersPage user={user} />} />
 
+      {/* Suspended users — show a simple blocked message */}
+      {isSuspended && (
+        <Route path="*" element={
+          <div className="fixed inset-0 flex items-center justify-center bg-background px-4">
+            <div className="max-w-md text-center space-y-4">
+              <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
+                <span className="text-3xl">🚫</span>
+              </div>
+              <h1 className="text-2xl font-bold text-navy">Account Suspended</h1>
+              <p className="text-muted-foreground">Your account has been suspended. Please contact <a href="mailto:support@alsdealflow.com" className="text-teal underline">support@alsdealflow.com</a> for assistance.</p>
+              <button onClick={() => base44.auth.logout()} className="text-sm text-muted-foreground underline">Sign out</button>
+            </div>
+          </div>
+        } />
+      )}
+
       {/* Onboarding — requires auth but not full approval */}
+      {!isSuspended && (
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route
           path="/onboarding"
           element={needsOnboarding ? <Onboarding /> : <Navigate to="/dashboard" replace />}
         />
       </Route>
+      )}
 
       {/* App routes — requires auth + approved */}
+      {!isSuspended && (
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         {needsOnboarding ? (
           <Route path="*" element={<Navigate to="/onboarding" replace />} />
@@ -79,6 +100,7 @@ const AuthenticatedApp = () => {
           </Route>
         )}
       </Route>
+      )}
     </Routes>
   );
 };
