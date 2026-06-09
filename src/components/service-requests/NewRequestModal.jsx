@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 
@@ -33,23 +34,18 @@ export default function NewRequestModal({
   const queryClient = useQueryClient();
   const [dealTitle, setDealTitle] = useState("");
   const [notes, setNotes] = useState("");
-  const [userSearch, setUserSearch] = useState("");
-  const [selectedParty, setSelectedParty] = useState(null);
+  const [selectedPartyId, setSelectedPartyId] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const filteredCounterparties = useMemo(() => {
-    const q = userSearch.toLowerCase();
-    return counterparties.filter(u =>
-      u.full_name?.toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q)
-    );
-  }, [counterparties, userSearch]);
+  const selectedParty = useMemo(
+    () => counterparties.find(u => u.id === selectedPartyId) || null,
+    [counterparties, selectedPartyId]
+  );
 
   const reset = () => {
     setDealTitle("");
     setNotes("");
-    setUserSearch("");
-    setSelectedParty(null);
+    setSelectedPartyId("");
   };
 
   const handleClose = () => {
@@ -58,7 +54,7 @@ export default function NewRequestModal({
   };
 
   const handleCreate = async () => {
-    if (!dealTitle.trim() || !selectedParty || !currentUser) return;
+    if (!dealTitle.trim() || !selectedPartyId || !currentUser) return;
     setSaving(true);
     const isTC = currentUser.role === "tc";
     try {
@@ -112,33 +108,21 @@ export default function NewRequestModal({
             <label className="text-sm font-semibold text-navy mb-1.5 block">
               {counterpartyLabel}
             </label>
-            <Input
-              value={userSearch}
-              onChange={e => { setUserSearch(e.target.value); setSelectedParty(null); }}
-              placeholder="Search by name or email…"
-            />
-            {userSearch && !selectedParty && (
-              <div className="mt-1 border border-border rounded-xl overflow-hidden max-h-36 overflow-y-auto shadow-sm">
-                {filteredCounterparties.slice(0, 6).map(u => (
-                  <button
-                    key={u.id}
-                    onClick={() => { setSelectedParty(u); setUserSearch(u.full_name); }}
-                    className="w-full text-left px-3 py-2.5 hover:bg-muted text-sm flex items-center gap-2.5 border-b border-border/50 last:border-0"
-                  >
-                    <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {u.full_name?.[0] || "?"}
-                    </div>
-                    <div>
-                      <p className="font-medium text-navy leading-tight">{u.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{u.email}</p>
-                    </div>
-                  </button>
+            <Select value={selectedPartyId} onValueChange={setSelectedPartyId}>
+              <SelectTrigger>
+                <SelectValue placeholder={`Select a ${counterpartyLabel}…`} />
+              </SelectTrigger>
+              <SelectContent>
+                {counterparties.map(u => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.full_name} {u.email ? `— ${u.email}` : ""}
+                  </SelectItem>
                 ))}
-                {filteredCounterparties.length === 0 && (
-                  <p className="text-sm text-muted-foreground px-3 py-3">No users found</p>
+                {counterparties.length === 0 && (
+                  <div className="text-sm text-muted-foreground px-3 py-3">No available TCs</div>
                 )}
-              </div>
-            )}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="text-sm font-semibold text-navy mb-1.5 block">Notes (optional)</label>
@@ -156,7 +140,7 @@ export default function NewRequestModal({
             <button
               className="flex-1 gradient-primary text-white font-semibold py-2 rounded-lg disabled:opacity-40 hover:opacity-90 transition-opacity"
               onClick={handleCreate}
-              disabled={!dealTitle.trim() || !selectedParty || saving}
+              disabled={!dealTitle.trim() || !selectedPartyId || saving}
             >
               {saving ? "Creating…" : "Create Request"}
             </button>
