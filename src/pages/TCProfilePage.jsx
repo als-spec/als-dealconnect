@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import ReviewForm from "../components/reviews/ReviewForm";
 import TCStatBar from "../components/profile/TCStatBar";
 import ServiceRateCard from "../components/profile/ServiceRateCard";
@@ -13,12 +13,14 @@ import TagPill from "../components/TagPill";
 import GradientButton from "../components/GradientButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Building2, ShieldCheck, Pencil, MessageSquare, CheckCircle2, Award } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { MapPin, Building2, ShieldCheck, Pencil, MessageSquare, CheckCircle2, Award, X } from "lucide-react";
 import { toast } from "sonner";
 import { toastMutationError } from "@/lib/toasts";
 
 export default function TCProfilePage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const profileUserId = searchParams.get("id");
 
   const { data: currentUser } = useCurrentUser();
@@ -26,6 +28,9 @@ export default function TCProfilePage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [msgSubject, setMsgSubject] = useState("");
+  const [sendingMsg, setSendingMsg] = useState(false);
 
   const isOwner = !profileUserId || profileUserId === currentUser?.id;
   const targetId = profileUserId || currentUser?.id;
@@ -84,6 +89,29 @@ export default function TCProfilePage() {
     // Invalidate both profile and reviews — a new profile means fresh reviews.
     queryClient.invalidateQueries({ queryKey: ['TCProfile', { user_id: targetId }] });
     queryClient.invalidateQueries({ queryKey: ['Review'] });
+  };
+
+  const handleSendMessage = async () => {
+    if (!msgSubject.trim() || !currentUser || !profileUser) return;
+    setSendingMsg(true);
+    try {
+      const thread = await base44.entities.MessageThread.create({
+        participants: [currentUser.id, profileUser.id],
+        participant_names: [currentUser.full_name, profileUser.full_name],
+        subject: msgSubject.trim(),
+        last_message: "",
+        last_message_at: new Date().toISOString(),
+        unread_by: [],
+      });
+      toast.success("Conversation started!");
+      setShowMessageModal(false);
+      setMsgSubject("");
+      navigate("/messages");
+    } catch {
+      toast.error("Failed to start conversation. Please try again.");
+    } finally {
+      setSendingMsg(false);
+    }
   };
 
   if (loading) {
@@ -159,10 +187,10 @@ export default function TCProfilePage() {
                     </Button>
                   ) : (
                     <>
-                      <Button variant="outline" className="gap-2">
+                      <Button variant="outline" className="gap-2" onClick={() => setShowMessageModal(true)}>
                         <MessageSquare className="w-4 h-4" /> Send Message
                       </Button>
-                      {currentUser?.role === "investor" && profile && (
+                      {profile && (
                         <Button variant="outline" className="gap-2" onClick={() => setShowReviewForm(true)}>
                           <Award className="w-4 h-4" /> Leave Review
                         </Button>
@@ -278,6 +306,41 @@ export default function TCProfilePage() {
         onClose={() => setShowReviewForm(false)}
         onSubmitted={() => queryClient.invalidateQueries({ queryKey: ['Review', { tc_profile_id: profile.id }] })}
       />
+    )}
+
+    {showMessageModal && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-card rounded-2xl p-6 w-full max-w-md border border-border shadow-xl">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="font-bold text-navy text-lg">Message {displayName}</h3>
+            <button onClick={() => setShowMessageModal(false)}>
+              <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+            </button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold text-navy mb-1.5 block">Subject</label>
+              <Input
+                value={msgSubject}
+                onChange={e => setMsgSubject(e.target.value)}
+                placeholder="What's this about?"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setShowMessageModal(false)}>
+                Cancel
+              </Button>
+              <button
+                className="flex-1 gradient-primary text-white font-semibold py-2 rounded-lg disabled:opacity-40 hover:opacity-90 transition-opacity"
+                onClick={handleSendMessage}
+                disabled={!msgSubject.trim() || sendingMsg}
+              >
+                {sendingMsg ? "Starting…" : "Start Conversation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     )}
     </>
   );
